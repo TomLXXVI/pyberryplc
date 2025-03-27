@@ -96,7 +96,7 @@ class DigitalOutput(GPIO):
         pin: int,
         label: str,
         pin_factory: PiFactory | None = None,
-        initial_value: bool | None = None
+        initial_value: bool | int | None = None
     ) -> None:
         """Creates a `DigitalOutput` object.
         

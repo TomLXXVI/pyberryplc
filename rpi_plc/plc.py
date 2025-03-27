@@ -166,6 +166,7 @@ class AbstractPLC(ABC):
         # writes to these registries.
         self.input_registry: dict[str, MemoryVariable] = {}
         self.output_registry: dict[str, MemoryVariable] = {}
+        self.step_registry: dict[str, MemoryVariable] = {}
         
         # To terminate program: press Ctrl-Z and method `exit_handler` will be
         # called which terminates the PLC scanning loop.
@@ -316,7 +317,18 @@ class AbstractPLC(ABC):
             self.output_registry[label],
             self.input_registry[f"{label}_status"]
         )
-        
+    
+    def add_step(self, label: str, init_value: bool | int = 0) -> MemoryVariable:
+        """Adds a step marker to the step-registry of the PLC-application and 
+        returns its `MemoryVariable` object.
+        """
+        step = MemoryVariable(
+            curr_state=init_value,
+            prev_state=init_value
+        )
+        self.step_registry[label] = step
+        return step
+
     def di_read(self, label: str) -> bool:
         """Reads the current state of the digital input specified by the given
         label.
@@ -387,7 +399,13 @@ class AbstractPLC(ABC):
                 output.write(self.output_registry[output.label].curr_state)
         except InternalCommunicationError as error:
             self.int_com_error_handler(error)
-
+    
+    def update_registries(self):
+        for step in self.step_registry.values():
+            step.update(step.curr_state)
+        for output in self.output_registry.values():
+            output.update(output.curr_state)
+    
     def int_com_error_handler(self, error: InternalCommunicationError):
         """Handles an `InternalCommunication` exception. An error message is
         sent to the logger. If the email notification service is used, an email
@@ -439,6 +457,7 @@ class AbstractPLC(ABC):
         """Implements the global running operation of the PLC-cycle."""
         while not self._exit:
             try:
+                self.update_registries()
                 self.read_inputs()
                 self.control_routine()
             except EmergencyException:
