@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rpi-gpio"
+version = "0.1.0"
+description = "PLC-programmeren met Python op Raspberry Pi"
+authors = [{ name = "Tom Christiaens", email = "mailbox.tom.chr@gmail.com" }]
+dependencies = [
+    "python-decouple",
+    "gpiozero",
+    "pigpio"
+]
+
+[tool.setuptools]
+packages = ["rpi_plc"]
