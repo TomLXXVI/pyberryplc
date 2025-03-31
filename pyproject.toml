@@ -5,12 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rpi-gpio"
 version = "0.1.0"
-description = "PLC-programmeren met Python op Raspberry Pi"
+description = "PLC-programming with Python on Raspberry Pi"
 authors = [{ name = "Tom Christiaens", email = "mailbox.tom.chr@gmail.com" }]
 dependencies = [
     "python-decouple",
     "gpiozero",
-    "pigpio"
+    "pigpio",
+    "pyserial"
 ]
 
 [tool.setuptools]

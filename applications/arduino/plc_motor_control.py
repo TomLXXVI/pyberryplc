@@ -124,8 +124,8 @@ class MotorControlPLC(AbstractPLC):
     def emergency_routine(self):
         try:
             self.exit_routine()
-        except Exception:
-            self.logger.error(f"")
+        except:
+            pass
 
 
 def main():
