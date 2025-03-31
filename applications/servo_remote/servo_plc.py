@@ -1,6 +1,6 @@
 import os
 from rpi_plc.plc import AbstractPLC
-from rpi_plc.remote_interface import RemoteDeviceClient
+from rpi_plc.remote_interface import TCPRemoteDeviceClient
 from rpi_plc.logging import init_logger
 
 
@@ -8,14 +8,14 @@ class ServoControlPLC(AbstractPLC):
     
     def __init__(self, pin_factory=None, eml_notification=None):
         super().__init__(pin_factory, eml_notification)
-        self.remote_device = RemoteDeviceClient(logger=self.logger.info)
+        self.remote_device = TCPRemoteDeviceClient(logger=self.logger)
 
         # Scan-flags
         self._first_scan = True
 
         # SFC-steps
-        self.X0 = self.add_step('X0')
-        self.X1 = self.add_step('X1')
+        self.X0 = self.add_marker('X0')
+        self.X1 = self.add_marker('X1')
 
         # Pushbutton input (GPIO 4)
         self.btn = self.add_digital_input(pin=4, label="BTN")

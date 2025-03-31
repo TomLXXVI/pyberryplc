@@ -3,7 +3,7 @@ import time
 
 class SingleScanTimer:
 
-    def __init__(self, dt_secs: int) -> None:
+    def __init__(self, dt_secs: int | float) -> None:
         """Creates a `SingleScanTimer` object.
         
         Parameters
@@ -40,12 +40,12 @@ class SingleScanTimer:
 
 class OnDelayTimer:
 
-    def __init__(self, dt_secs: int) -> None:
+    def __init__(self, dt_secs: int | float) -> None:
         """Creates an `OnDelayTimer` object.
 
         Parameters
         ----------
-        dt_secs: int
+        dt_secs:
             Time span in seconds.
         """
         self.dt = dt_secs
@@ -72,12 +72,12 @@ class OnDelayTimer:
 
 class OffDelayTimer:
 
-    def __init__(self, dt_secs: int) -> None:
+    def __init__(self, dt_secs: int | float) -> None:
         """Creates an `OffDelayTimer` object.
 
         Parameters
         ----------
-        dt_secs: int
+        dt_secs:
             Time span in seconds.
         """
         self.dt = dt_secs

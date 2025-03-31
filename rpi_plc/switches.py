@@ -42,6 +42,8 @@ class ToggleSwitch:
         c2 = self._button.curr_state
         if c1 and c2:
             self._switch.update(not self._switch.curr_state)
+        else:
+            self._switch.update(self._switch.curr_state)
     
     @property
     def curr_state(self) -> bool:

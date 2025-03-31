@@ -166,7 +166,7 @@ class AbstractPLC(ABC):
         # writes to these registries.
         self.input_registry: dict[str, MemoryVariable] = {}
         self.output_registry: dict[str, MemoryVariable] = {}
-        self.step_registry: dict[str, MemoryVariable] = {}
+        self.marker_registry: dict[str, MemoryVariable] = {}
         
         # To terminate program: press Ctrl-Z and method `exit_handler` will be
         # called which terminates the PLC scanning loop.
@@ -318,16 +318,16 @@ class AbstractPLC(ABC):
             self.input_registry[f"{label}_status"]
         )
     
-    def add_step(self, label: str, init_value: bool | int = 0) -> MemoryVariable:
-        """Adds a step marker to the step-registry of the PLC-application and 
+    def add_marker(self, label: str, init_value: bool | int = 0) -> MemoryVariable:
+        """Adds a marker to the marker-registry of the PLC-application and 
         returns its `MemoryVariable` object.
         """
-        step = MemoryVariable(
+        marker = MemoryVariable(
             curr_state=init_value,
             prev_state=init_value
         )
-        self.step_registry[label] = step
-        return step
+        self.marker_registry[label] = marker
+        return marker
 
     def di_read(self, label: str) -> bool:
         """Reads the current state of the digital input specified by the given
@@ -401,8 +401,8 @@ class AbstractPLC(ABC):
             self.int_com_error_handler(error)
     
     def update_registries(self):
-        for step in self.step_registry.values():
-            step.update(step.curr_state)
+        for marker in self.marker_registry.values():
+            marker.update(marker.curr_state)
         for output in self.output_registry.values():
             output.update(output.curr_state)
     
@@ -454,7 +454,7 @@ class AbstractPLC(ABC):
         ...
 
     def run(self):
-        """Implements the global running operation of the PLC-cycle."""
+        """Implements the global running operation of the PLC."""
         while not self._exit:
             try:
                 self.update_registries()
