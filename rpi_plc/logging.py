@@ -27,7 +27,7 @@ def init_logger(logging_level: str = "info"):
 
     # noinspection PyTypeChecker
     file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename='unipi.log',
+        filename='rpi-plc.log',
         when='midnight',
         atTime=datetime.time(16, 0, 0)
     )

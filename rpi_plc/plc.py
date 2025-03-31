@@ -114,12 +114,12 @@ class MemoryVariable:
 
 class AbstractPLC(ABC):
     """
-    Implements common functionality of any PLC application running on a 
-    Raspberry Pi.
+    Framework class: implements the functionality common to any PLC application 
+    running on a Raspberry Pi.
 
     To write a specific PLC application, the user needs to write its own class
-    that must be derived from this base class and implements the abstract
-    methods of this base class.
+    derived from this base class and implementing the abstract methods of this 
+    base class.
     """
     def __init__(
         self,
