@@ -95,6 +95,7 @@ class DigitalOutput(GPIO):
         self,
         pin: int,
         label: str,
+        active_high: bool = True,
         pin_factory: PiFactory | None = None,
         initial_value: bool | int | None = None
     ) -> None:
@@ -107,6 +108,11 @@ class DigitalOutput(GPIO):
         label:
             Meaningful name for the digital output. This will be the name used
             in the PLC application to access the output.
+        active_high:
+            If `True`, the output will be HIGH (e.g. at 5 V or 3.3 V) when 
+            triggered (i.e. when writing 1 to it).
+            If `False`, the opposite happens: the output will be LOW (pulled to 
+            GND) when the output is triggered.
         pin_factory:
             Abstraction layer that allows `gpiozero` to interface with the
             hardware-specific GPIO implementation behind the scenes. If `None`,
@@ -121,7 +127,7 @@ class DigitalOutput(GPIO):
         self.initial_value = initial_value
         self._device = DigitalOutputDevice(
             self.pin, 
-            active_high=True,
+            active_high=active_high,
             initial_value=initial_value,
             pin_factory=self.pin_factory
         )
@@ -130,7 +136,11 @@ class DigitalOutput(GPIO):
         return self._device.value
     
     def write(self, value: bool | int) -> None:
-        self._device.value = value
+        try:
+            value = bool(value) if isinstance(value, int) else value
+            self._device.value = value
+        except:
+            raise ValueError("Value must be `bool` or`int`.")
 
 
 class PWMOutput(GPIO):

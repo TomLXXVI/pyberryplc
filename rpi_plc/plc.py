@@ -74,7 +74,7 @@ class MemoryVariable:
             raise ValueError("Memory variable is not single bit.")
     
     @property
-    def raising_edge(self) -> bool:
+    def rising_edge(self) -> bool:
         """Returns `True` if `prev_state` is 0 and `curr_state` is 1. Only for 
         single bit variables (attribute `is_binary` must be `True`; if `is_binary` 
         is `False`, a `ValueError` exception is raised).
@@ -219,6 +219,7 @@ class AbstractPLC(ABC):
         self,
         pin: str | int,
         label: str,
+        active_high: bool = True,
         init_value: bool = 0
     ) -> tuple[MemoryVariable, MemoryVariable]:
         """Adds a digital output to the PLC application.
@@ -230,6 +231,11 @@ class AbstractPLC(ABC):
         label:
             Meaningful name for the digital input. This will be the name used
             in the PLC application to access the input.
+        active_high:
+            If `True`, the output will be HIGH (e.g. at 5 V or 3.3 V) when 
+            triggered (i.e. when writing 1 to it).
+            If `False`, the opposite happens: the output will be LOW (pulled to 
+            GND) when the output is triggered.
         init_value:
             Initial value that must be written to the digital output.
         
@@ -241,6 +247,7 @@ class AbstractPLC(ABC):
         self._outputs[label] = DigitalOutput(
             pin, 
             label,
+            active_high,
             self.pin_factory,
             init_value
         )

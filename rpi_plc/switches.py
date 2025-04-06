@@ -64,7 +64,7 @@ class ToggleSwitch:
         return self._switch.curr_state
 
     @property
-    def raising_edge(self) -> bool:
+    def rising_edge(self) -> bool:
         """Returns `True` if `prev_state` is 0 and `curr_state` is 1."""
         return self.curr_state and not self.prev_state
 

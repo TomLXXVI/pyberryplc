@@ -44,7 +44,7 @@ class ServoControlPLC(AbstractPLC):
             self.command_done = False
         
         if self.X1.active:
-            if self.X1.raising_edge:
+            if self.X1.rising_edge:
                 try:
                     self.remote_device.send_command({"command": "move"})
                     self.logger.info("Command 'move' sent to slave.")

@@ -49,7 +49,7 @@ class MotorControlPLC(AbstractPLC):
 
     def sequence_control(self):
         # X0 -> X1: start button raising edge
-        if self.X0.active and self.start_btn.raising_edge:
+        if self.X0.active and self.start_btn.rising_edge:
             self.X0.deactivate()
             self.X1.activate()
 
@@ -81,21 +81,21 @@ class MotorControlPLC(AbstractPLC):
             self.step2_finished = False
             self.step3_finished = False
 
-        if self.X1.raising_edge:
+        if self.X1.rising_edge:
             r = self._send_command({"command": "start"})
             if r:
                 self.step1_finished = True
             else:
                 raise EmergencyException
             
-        if self.X2.raising_edge:
+        if self.X2.rising_edge:
             r = self._send_command({"command": "set_speed", "value": 240})
             if r:
                 self.step2_finished = True
             else:
                 raise EmergencyException
             
-        if self.X3.raising_edge:
+        if self.X3.rising_edge:
             r = self._send_command({"command": "stop"})
             if r:
                 self.step3_finished = True

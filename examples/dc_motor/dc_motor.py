@@ -30,7 +30,7 @@ class PLC(AbstractPLC):
     def _sequence_control(self):
         # Update soft switch state (depends on the current state of the button) 
         self.switch.update()
-        if self.switch.raising_edge:
+        if self.switch.rising_edge:
             self.logger.info('Press button to stop motor.')
         if self.switch.falling_edge:
             self.logger.info('Press button to start motor.')

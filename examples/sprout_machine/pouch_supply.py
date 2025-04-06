@@ -170,7 +170,7 @@ class PLC(AbstractPLC):
             pass
         
         if self.X11.active:
-            if self.X11.raising_edge:
+            if self.X11.rising_edge:
                 self.logger.info("Transfer pouch to POS1.")
                 self.T1.reset()
             # simulate action
@@ -187,7 +187,7 @@ class PLC(AbstractPLC):
             pass
         
         if self.X21.active:
-            if self.X21.raising_edge:
+            if self.X21.rising_edge:
                 self.logger.info("Transfer pouch from POS1 to POS2.")
                 self.T2.reset()
             # simulate action
@@ -202,7 +202,7 @@ class PLC(AbstractPLC):
             pass
         
         if self.X31.active:
-            if self.X31.raising_edge:
+            if self.X31.rising_edge:
                 try:
                     self.logger.info("Transfer pouch from POS2 to carrousel.")
                     self.servo_drive.send_command({"command": "move"})
@@ -225,7 +225,7 @@ class PLC(AbstractPLC):
             pass
         
         if self.X41.active:
-            if self.X41.raising_edge:
+            if self.X41.rising_edge:
                 self.logger.info("Turn carrousel one position.")
                 self.T4.reset()
             # simulate action
