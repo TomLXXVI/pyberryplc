@@ -1,4 +1,4 @@
-from rpi_plc.stepper.tmc2208 import TMC2208StepperMotor
+from rpi_plc.stepper.stepper_gpio import TMC2208StepperMotor
 import time
 
 # Stel hier je GPIO-pinnen in
