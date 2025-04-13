@@ -2,7 +2,7 @@ import socket
 import json
 import threading
 import time
-from rpi_plc.gpio import PWMOutput, DigitalOutput
+from rpi_plc.core.gpio import PWMOutput, DigitalOutput
 
 SERVO_GPIO = 13
 LED_GPIO = 24

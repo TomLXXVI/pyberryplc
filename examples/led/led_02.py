@@ -1,7 +1,7 @@
 import os
-from rpi_plc import AbstractPLC, MemoryVariable
-from rpi_plc.switches import ToggleSwitch
-from rpi_plc.logging import init_logger
+from rpi_plc.core import AbstractPLC, MemoryVariable
+from rpi_plc.core.switches import ToggleSwitch
+from rpi_plc.log_utils import init_logger
 
 
 class LedPLC(AbstractPLC):

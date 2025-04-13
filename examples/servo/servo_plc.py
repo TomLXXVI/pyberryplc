@@ -1,7 +1,7 @@
 import os
-from rpi_plc import AbstractPLC, MemoryVariable
-from rpi_plc.timers import OnDelayTimer
-from rpi_plc.logging import init_logger
+from rpi_plc.core import AbstractPLC, MemoryVariable
+from rpi_plc.core.timers import TimerOnDelay
+from rpi_plc.log_utils import init_logger
 
 
 class ServoSubroutine:
@@ -36,7 +36,7 @@ class ServoSubroutine:
         # We need a timer to move from one step to the next as the servo motor
         # does not provide feedback when the desired angle in the step has been
         # reached.
-        self.step_timer = OnDelayTimer(1)
+        self.step_timer = TimerOnDelay(1)
         # To avoid code duplication, we use a step counter to keep track of
         # which step is active.
         self.step_counter = 0

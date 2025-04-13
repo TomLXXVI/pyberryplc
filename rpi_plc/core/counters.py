@@ -1,6 +1,6 @@
 
 
-class UpCounter:
+class CounterUp:
     
     def __init__(self) -> None:
         self.value: int = 0
@@ -12,7 +12,7 @@ class UpCounter:
         self.value = 0
 
 
-class DownCounter:
+class CounterDown:
     
     def __init__(self, preset_val: int) -> None:
         self.preset_value = preset_val
@@ -26,7 +26,7 @@ class DownCounter:
         self.value = self.preset_value
 
 
-class UpDownCounter:
+class CounterUpDown:
     
     def __init__(self, preset_value: int = 0) -> None:
         self.preset_value = preset_value

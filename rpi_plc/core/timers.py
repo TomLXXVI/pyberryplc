@@ -1,7 +1,7 @@
 import time
 
 
-class SingleScanTimer:
+class TimerSingleScan:
 
     def __init__(self, dt_secs: int | float) -> None:
         """Creates a `SingleScanTimer` object.
@@ -38,7 +38,7 @@ class SingleScanTimer:
         return False
 
 
-class OnDelayTimer:
+class TimerOnDelay:
 
     def __init__(self, dt_secs: int | float) -> None:
         """Creates an `OnDelayTimer` object.
@@ -54,7 +54,7 @@ class OnDelayTimer:
     @property
     def has_elapsed(self) -> bool:
         """Returns `False` as long as the set time span has not elapsed, and 
-        `True` once the time span of the timer has elapsed. 
+        returns `True` once the time span of the timer has elapsed. 
         To reset the timer, method `reset` must be called.
         """
         if self._t_start is None:
@@ -70,7 +70,7 @@ class OnDelayTimer:
         self._t_start = None
 
 
-class OffDelayTimer:
+class TimerOffDelay:
 
     def __init__(self, dt_secs: int | float) -> None:
         """Creates an `OffDelayTimer` object.
@@ -86,7 +86,7 @@ class OffDelayTimer:
     @property
     def running(self) -> bool:
         """Returns `True` as long as the set time span has not elapsed, and 
-        `False` once the time span of the timer has elapsed.
+        returns `False` once the time span of the timer has elapsed.
         To reset the timer, method `reset` must be called.
         """
         if self._t_start is None:

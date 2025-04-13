@@ -1,11 +1,11 @@
 import os
 import subprocess
-from rpi_plc import AbstractPLC
-from rpi_plc.switches import ToggleSwitch
-from rpi_plc.timers import OnDelayTimer
-from rpi_plc.counters import UpCounter
+from rpi_plc.core import AbstractPLC
+from rpi_plc.core.switches import ToggleSwitch
+from rpi_plc.core.timers import TimerOnDelay
+from rpi_plc.core.counters import CounterUp
 from rpi_plc.remote_interface import TCPRemoteDeviceClient
-from rpi_plc.logging import init_logger
+from rpi_plc.log_utils import init_logger
 
 
 class PLC(AbstractPLC):
@@ -54,13 +54,13 @@ class PLC(AbstractPLC):
         self.batch_size: int = 0
         
         # Timers
-        self.T1 = OnDelayTimer(1)
-        self.T2 = OnDelayTimer(2)
-        self.T3 = OnDelayTimer(0.5)
-        self.T4 = OnDelayTimer(1)
+        self.T1 = TimerOnDelay(1)
+        self.T2 = TimerOnDelay(2)
+        self.T3 = TimerOnDelay(0.5)
+        self.T4 = TimerOnDelay(1)
         
         # Counters
-        self.pouch_counter = UpCounter()
+        self.pouch_counter = CounterUp()
         
     def init_control(self):
         if self.init_flag:

@@ -1,7 +1,7 @@
 import time
 import logging
 from abc import ABC, abstractmethod
-from rpi_plc.gpio import DigitalOutput
+from rpi_plc.core.gpio import DigitalOutput
 from .speed_profiles import SpeedProfile
 
 

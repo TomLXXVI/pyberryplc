@@ -1,5 +1,5 @@
 import logging
-from rpi_plc.gpio import DigitalOutput
+from rpi_plc.core.gpio import DigitalOutput
 from rpi_plc.stepper.stepper_gpio.base import StepperMotor
 
 

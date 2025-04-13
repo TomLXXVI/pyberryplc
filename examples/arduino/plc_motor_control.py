@@ -1,9 +1,9 @@
 import os
-from rpi_plc import AbstractPLC
+from rpi_plc.core import AbstractPLC
 from rpi_plc.remote_interface import SerialRemoteDeviceClient
-from rpi_plc.timers import OnDelayTimer
-from rpi_plc.logging import init_logger
-from rpi_plc.exceptions import EmergencyException
+from rpi_plc.core.timers import TimerOnDelay
+from rpi_plc.log_utils import init_logger
+from rpi_plc.core.exceptions import EmergencyException
 
 
 class MotorControlPLC(AbstractPLC):
@@ -26,7 +26,7 @@ class MotorControlPLC(AbstractPLC):
         self.timer_start = 0.0
         
         # === Timers ===
-        self.T1 = OnDelayTimer(5)
+        self.T1 = TimerOnDelay(5)
         
         # === Internal Flags ===
         self.init_flag = True

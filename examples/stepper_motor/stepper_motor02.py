@@ -1,6 +1,6 @@
 import os
 from rpi_plc import AbstractPLC
-from rpi_plc.logging import init_logger
+from rpi_plc.log_utils import init_logger
 from rpi_plc.stepper.stepper_gpio import TMC2208StepperMotor
 from rpi_plc.stepper.stepper_gpio import TrapezoidalProfile
 
