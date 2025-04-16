@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# === CONFIGURATIE ===
+# === CONFIGURATION ===
 PROJECT_DIR="/shared/python-projects/rpi-gpio/examples/stepper_motor"
 VENV_PATH="/home/tom-chr/.virtualenvs/rpi-gpio"
-SCRIPT="stepper_motor02.py"  # of jouw testscript
+SCRIPT="stepper_motor04.py"
 
-# === UITVOERING ===
+# === EXECUTION ===
 cd "$PROJECT_DIR" || { echo "Directory not found"; exit 1; }
 
 PYTHON="$VENV_PATH/bin/python"

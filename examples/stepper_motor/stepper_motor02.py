@@ -1,103 +1,53 @@
-import os
-from rpi_plc import AbstractPLC
-from rpi_plc.log_utils import init_logger
 from rpi_plc.stepper.stepper_gpio import TMC2208StepperMotor
-from rpi_plc.stepper.stepper_gpio import TrapezoidalProfile
+import time
 
-from keyboard_input import KeyInput
+# Stel hier je GPIO-pinnen in
+STEP_PIN = 27
+DIR_PIN = 26
+EN_PIN = 19
+MS1_PIN = 23
+MS2_PIN = 24
 
+motor = TMC2208StepperMotor(
+    step_pin=STEP_PIN,
+    dir_pin=DIR_PIN,
+    enable_pin=EN_PIN,
+    ms1_pin=MS1_PIN,
+    ms2_pin=MS2_PIN,
+    microstep_mode="1/8",
+    steps_per_revolution=200
+)
 
-class PLC(AbstractPLC):
-    
-    def __init__(self):
-        super().__init__()
-        self.key_input = KeyInput()
+# Trapeziumprofiel parameters
+total_steps = 1600
+min_speed = 100     # stappen per seconde
+max_speed = 800     # stappen per seconde
+acc_steps = 400     # aantal stappen voor versnellen
+dec_steps = 400     # aantal stappen voor vertragen
+flat_steps = total_steps - acc_steps - dec_steps
 
-        self.stepper = TMC2208StepperMotor(
-            step_pin=27,
-            dir_pin=26,
-            enable_pin=19,
-            ms1_pin=13,
-            ms2_pin=21,
-            microstep_mode="1/16",
-            steps_per_revolution=200,
-            logger=self.logger
-        )
-        
-        self.profile = TrapezoidalProfile(
-            min_angular_speed=11.25,
-            max_angular_speed=720.0,
-            accel_angle=90,
-            decel_angle=90
-        )
-                
-        self.X0 = self.add_marker("X0")
-        self.X1 = self.add_marker("X1")
-        self.X2 = self.add_marker("X2")
+def rotate_n_steps(n: int, speed: float) -> None:
+    delay = 1.0 / speed / 2
+    for _ in range(n):
+        motor.step.write(True)
+        time.sleep(delay)
+        motor.step.write(False)
+        time.sleep(delay)
 
-        self.input_flag = True
+# Richting instellen
+motor.dir.write(True)  # of False
 
-    def control_routine(self):
-        self.key_input.update()
-        self.init_control()
-        self.sequence_control()
-        self.execute_actions()
-    
-    def init_control(self):
-        if self.input_flag:
-            self.input_flag = False
-            self.X0.activate()
-    
-    def sequence_control(self):
-        if self.X0.active and self.key_input.rising_edge('w'):
-            self.X0.deactivate()
-            self.X1.activate()
-            
-        if self.X1.active and self.key_input.rising_edge('s'):
-            self.X1.deactivate()
-            self.X2.activate()
-        
-        if self.X2.active and self.key_input.rising_edge('q'):
-            self.X2.deactivate()
-            self.X0.activate()
-            
-    def execute_actions(self):
-        if self.X0.rising_edge:
-            self.logger.info("Press key 'w' to turn motor forward.")
-            
-        if self.X1.rising_edge:
-            self.logger.info("Turn forward")
-            self.stepper.rotate(
-                degrees=1080, 
-                direction="forward", 
-                profile=self.profile
-            )
-            self.logger.info("Press key 's' to turn motor backward.")
-            
-        if self.X2.rising_edge:
-            self.logger.info("Turn backward")
-            self.stepper.rotate(
-                degrees=1080, 
-                direction="backward", 
-                profile=self.profile
-            )
-            self.logger.info("Press key 'q' to start new cycle or <Ctrl-Z> to exit.")
-            
-    def exit_routine(self):
-        self.logger.info("PLC stopped. Motor turned off.")
-        self.stepper.disable()
-    
-    def emergency_routine(self):
-        pass
+print("Versnellen...")
+for i in range(acc_steps):
+    speed = min_speed + (max_speed - min_speed) * (i / acc_steps)
+    rotate_n_steps(1, speed)
 
+print("Constante snelheid...")
+rotate_n_steps(flat_steps, max_speed)
 
-def main():
-    os.system("clear")
-    print(f"Running as user: {os.geteuid()}")
-    init_logger()
-    plc = PLC()
-    plc.run()
-    
+print("Vertragen...")
+for i in range(dec_steps):
+    speed = max_speed - (max_speed - min_speed) * (i / dec_steps)
+    rotate_n_steps(1, speed)
 
-if __name__ == "__main__":
-    main()
+print("Beweging voltooid.")

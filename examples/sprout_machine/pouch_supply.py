@@ -83,8 +83,8 @@ class PLC(AbstractPLC):
         
         # Stop condition
         stop_condition = (
-                self.stop_switch.active 
-                or self.pouch_counter.value == self.batch_size
+            self.stop_switch.active 
+            or self.pouch_counter.value == self.batch_size
         )
         
         if self.X0.active and self.start_btn.active:

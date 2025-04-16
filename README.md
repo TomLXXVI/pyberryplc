@@ -1,53 +1,60 @@
-# python-rpi-gpio
+# rpi-gpio
 
-A modular Python package that enables programmable PLC-style control on a 
-Raspberry Pi using GPIO pins. Ideal for building small automation systems, 
-testing I/O logic, or integrating with remote devices such as Arduino.
+A modular Python package for developing PLC-like applications on the Raspberry Pi.  
+Supports digital I/O, timers, counters, edge detection, and stepper motor control via GPIO or UART.
 
----
+## 🚀 Features
 
-## Features
+- PLC-inspired framework with scan-cycle logic
+- Support for digital inputs, outputs, PWM
+- Built-in timers (TON, TOF) and counters
+- Edge-detecting switches (rising/falling/toggle)
+- Stepper motor drivers:
+  - A4988 (via GPIO)
+  - TMC2208 (via GPIO or UART)
+- UART configuration support for Trinamic drivers
+- Modular structure for extension and testing
 
-- PLC-style control structure (scan cycle, memory variables)
-- Digital input and output abstraction
-- PWM output with configurable pulse timing
-- Serial and TCP communication with external devices
-- Seamless integration with `gpiozero` and `pigpio` under the hood
+## 🧱 Project structure
 
----
-
-## Installation
-
-Make sure you're using Python 3.10 or higher. This package is intended for use 
-**only on Raspberry Pi OS**.
-
-```bash
-# Clone the repository
-$ git clone https://github.com/TomLXXVI/python-rpi-gpio.git
-$ cd python-rpi-gpio
-
-# (Optional) Create a virtual environment
-$ python -m venv .venv
-$ source .venv/bin/activate  # Raspberry Pi/Linux only
-
-# Install dependencies
-> pip install .
+```
+rpi_plc/
+├── core/              # PLC core logic: gpio, timers, counters, switches
+├── stepper/           # Stepper motor control (GPIO and UART)
+│   ├── stepper_gpio/
+│   └── stepper_uart/
+├── utils/             # Auxiliary tools (e.g. email notifications)
+├── remote_interface.py
+├── log_utils.py
+└── ...
 ```
 
----
+## 📦 Installation (for development)
 
-## Hardware Compatibility
+```bash
+git clone https://github.com/yourusername/rpi-gpio.git
+cd rpi-gpio
+pip install -e .
+```
 
-- Works exclusively on Raspberry Pi with GPIO support
-- Supports external devices like:
-  - Arduino (via USB serial)
-  - Other TCP/UDP remote devices
+Requires Python 3.11 or higher.
 
-You can integrate any hardware that communicates via digital I/O, PWM, or 
-JSON over serial/TCP.
+## 🧪 Example usage
 
----
+```python
+from rpi_plc.core import AbstractPLC, DigitalInput, DigitalOutput, TimerOnDelay
+from rpi_plc.stepper import A4988StepperMotor
+```
 
-## License
+See the `examples/` folder for test scripts and sample PLC applications.
 
-This project is licensed under the MIT License. See `LICENSE.md` for details.
+## ⚙️ Requirements
+
+- `gpiozero`
+- `pigpio`
+- `pyserial`
+- `python-decouple` (for environment configuration)
+
+## 📄 License
+
+This project is licensed under the terms of the MIT license.
