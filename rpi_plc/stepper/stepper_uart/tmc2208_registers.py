@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from .uart_registers import Register
 
 
 @dataclass
-class GCONFRegister:
+class GCONFRegister(Register):
     """
     Parsed representation of the GCONF register (0x00).
     See TMC2208 datasheet Rev. 1.13, Table 5.1.
@@ -32,25 +33,29 @@ class GCONFRegister:
             "multistep_filt": self.multistep_filt,
             "test_mode": self.test_mode,
         }
-
-
-def parse_gconf(value: int) -> GCONFRegister:
-    return GCONFRegister(
-        i_scale_analog=bool((value >> 0) & 1),
-        internal_rsense=bool((value >> 1) & 1),
-        en_spreadcycle=bool((value >> 2) & 1),
-        shaft=bool((value >> 3) & 1),
-        index_otpw=bool((value >> 4) & 1),
-        index_step=bool((value >> 5) & 1),
-        pdn_disable=bool((value >> 6) & 1),
-        mstep_reg_select=bool((value >> 7) & 1),
-        multistep_filt=bool((value >> 8) & 1),
-        test_mode=bool((value >> 9) & 1),
-    )
+    
+    @classmethod
+    def field_layout(cls) -> dict[str, tuple[int, int]]:
+        """
+        Returns the bit-layout of the GCONF register as a mapping from
+        field names to (bit-position, bit-width).
+        """
+        return {
+            "i_scale_analog":     (0, 1),
+            "internal_rsense":    (1, 1),
+            "en_spreadcycle":     (2, 1),
+            "shaft":              (3, 1),
+            "index_otpw":         (4, 1),
+            "index_step":         (5, 1),
+            "pdn_disable":        (6, 1),
+            "mstep_reg_select":   (7, 1),
+            "multistep_filt":     (8, 1),
+            "test_mode":          (9, 1)
+        }
 
 
 @dataclass
-class GSTATRegister:
+class GSTATRegister(Register):
     """
     Parsed representation of the GSTAT register (0x01).
     See TMC2208 datasheet Rev. 1.13, Table 5.1.
@@ -66,18 +71,14 @@ class GSTATRegister:
             "drv_err": self.drv_err,
             "uv_cp": self.uv_cp,
         }
-
-
-def parse_gstat(value: int) -> GSTATRegister:
-    return GSTATRegister(
-        reset=bool((value >> 0) & 1),
-        drv_err=bool((value >> 1) & 1),
-        uv_cp=bool((value >> 2) & 1),
-    )
+    
+    @classmethod
+    def field_layout(cls) -> dict[str, tuple[int, int]]:
+        pass
 
 
 @dataclass
-class IOINRegister:
+class IOINRegister(Register):
     """
     Parsed representation of the IOIN register (0x06).
     See TMC2208 datasheet Rev. 1.13, Table 5.1.
@@ -105,24 +106,14 @@ class IOINRegister:
             "dir": self.dir,
             "version": self.version,
         }
-
-
-def parse_ioin(value: int) -> IOINRegister:
-    return IOINRegister(
-        enn=bool((value >> 0) & 1),
-        ms1=bool((value >> 2) & 1),
-        ms2=bool((value >> 3) & 1),
-        diag=bool((value >> 4) & 1),
-        pdn_uart=bool((value >> 6) & 1),
-        step=bool((value >> 7) & 1),
-        sel_a=bool((value >> 8) & 1),
-        dir=bool((value >> 9) & 1),
-        version=(value >> 24) & 0xFF,
-    )
+    
+    @classmethod
+    def field_layout(cls) -> dict[str, tuple[int, int]]:
+        pass
 
 
 @dataclass
-class CHOPCONFRegister:
+class CHOPCONFRegister(Register):
     """
     Parsed representation of the CHOPCONF register (0x6C).
     See TMC2208 datasheet Rev. 1.13, Table 5.4.1
@@ -152,25 +143,29 @@ class CHOPCONFRegister:
             "diss2g": self.diss2g,
             "diss2vs": self.diss2vs,
         }
-
-
-def parse_chopconf(value: int) -> CHOPCONFRegister:
-    return CHOPCONFRegister(
-        toff=(value >> 0) & 0xF,
-        hstrt=(value >> 4) & 0x7,
-        hend=(value >> 7) & 0xF,
-        tbl=(value >> 15) & 0x3,
-        vsense=bool((value >> 17) & 1),
-        mres=(value >> 24) & 0xF,
-        intpol=bool((value >> 28) & 1),
-        dedge=bool((value >> 29) & 1),
-        diss2g=bool((value >> 30) & 1),
-        diss2vs=bool((value >> 31) & 1),
-    )
+    
+    @classmethod
+    def field_layout(cls) -> dict[str, tuple[int, int]]:
+        """
+        Returns the bit-layout of the CHOPCONF register as a mapping from
+        field names to (bit-position, bit-width).
+        """
+        return {
+            "toff":     (0, 4),
+            "hstrt":    (4, 3),
+            "hend":     (7, 4),
+            "tbl":      (15, 2),
+            "vsense":   (17, 1),
+            "mres":     (24, 4),
+            "intpol":   (28, 1),
+            "dedge":    (29, 1),
+            "diss2g":   (30, 1),
+            "diss2vs":  (31, 1),
+        }
 
 
 @dataclass
-class DRVSTATUSRegister:
+class DRVSTATUSRegister(Register):
     """
     Parsed representation of the DRV_STATUS register (0x6F).
     See TMC2208 datasheet Rev. 1.13, Table 39 (p. 35).
@@ -202,19 +197,7 @@ class DRVSTATUSRegister:
             "cs_actual": self.cs_actual,
             "stealth": self.stealth,
         }
-
-
-def parse_drv_status(value: int) -> DRVSTATUSRegister:
-    return DRVSTATUSRegister(
-        stst=bool((value >> 31) & 1),
-        olb=bool((value >> 7) & 1),
-        ola=bool((value >> 6) & 1),
-        s2gb=bool((value >> 3) & 1),
-        s2ga=bool((value >> 2) & 1),
-        s2vsb=bool((value >> 5) & 1),
-        s2vsa=bool((value >> 4) & 1),
-        otpw=bool((value >> 0) & 1),
-        ot=bool((value >> 1) & 1),
-        cs_actual=(value >> 16) & 0x1F,
-        stealth=bool((value >> 30) & 1),
-    )
+    
+    @classmethod
+    def field_layout(cls) -> dict[str, tuple[int, int]]:
+        pass

@@ -2,6 +2,7 @@ import logging
 from rpi_plc.core.gpio import DigitalOutput
 from rpi_plc.stepper.stepper_gpio.base import StepperMotor
 
+
 class A4988StepperMotor(StepperMotor):
     """
     Stepper motor controlled via an A4988 driver and GPIO.
@@ -16,7 +17,6 @@ class A4988StepperMotor(StepperMotor):
         ms1_pin: int | None = None,
         ms2_pin: int | None = None,
         ms3_pin: int | None = None,
-        microstep_mode: str = "1/16",
         steps_per_revolution: int = 200,
         logger: logging.Logger | None = None
     ) -> None:
@@ -37,28 +37,16 @@ class A4988StepperMotor(StepperMotor):
             GPIO pin connected to MS2 for microstepping control.
         ms3_pin : int | None, optional
             GPIO pin connected to MS3 for microstepping control.
-        microstep_mode : str, optional
-            Microstepping mode: "full", "1/2", "1/4", "1/8", or "1/16". Default is "1/16".
         steps_per_revolution : int, optional
             Number of full steps per motor revolution. Default is 200.
         logger : logging.Logger | None, optional
             Logger instance for debug/info output.
         """
-        super().__init__(steps_per_revolution, logger)
-        self.step = DigitalOutput(step_pin, label="STEP", active_high=True)
-        self.dir = DigitalOutput(dir_pin, label="DIR", active_high=True)
-        self.enable = DigitalOutput(enable_pin, label="EN", active_high=False) if enable_pin is not None else None
-
+        super().__init__(step_pin, dir_pin, enable_pin, steps_per_revolution, logger)
         self.ms1 = DigitalOutput(ms1_pin, label="MS1") if ms1_pin is not None else None
         self.ms2 = DigitalOutput(ms2_pin, label="MS2") if ms2_pin is not None else None
         self.ms3 = DigitalOutput(ms3_pin, label="MS3") if ms3_pin is not None else None
-
-        if self.enable:
-            self.enable.write(True)  # LOW (active)
-        
-        self.microstep_mode = microstep_mode
-        self.set_microstepping(microstep_mode)
-
+    
     def set_microstepping(self, mode: str) -> None:
         """
         Configure microstepping mode.
@@ -88,6 +76,7 @@ class A4988StepperMotor(StepperMotor):
                 f"Microstepping set to {mode} "
                 f"(MS1={ms1_val}, MS2={ms2_val}, MS3={ms3_val})"
             )
+            self.microstep_mode = mode
         else:
             self.logger.warning(
                 f"[{self.__class__.__name__}] "

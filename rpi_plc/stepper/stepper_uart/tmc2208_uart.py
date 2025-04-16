@@ -1,5 +1,14 @@
-import serial
 from typing import Optional
+import serial
+import time
+from .uart_registers import Register
+from .tmc2208_registers import (
+    CHOPCONFRegister, 
+    GCONFRegister, 
+    GSTATRegister,
+    IOINRegister,
+    DRVSTATUSRegister
+)
 
 
 class TMC2208UART:
@@ -22,7 +31,14 @@ class TMC2208UART:
     slave_address : int, optional
         Address of the TMC2208 slave device (default is 0x00).
     """
-
+    REGISTER_CLASS_MAP = {
+        "CHOPCONF": (0x6C, CHOPCONFRegister, "RW"),
+        "GCONF": (0x00, GCONFRegister, "RW"),
+        "GSTAT": (0x01, GSTATRegister, "RW"),
+        "IOIN": (0x06, IOINRegister, "R"),
+        "DRV_STATUS": (0x6F, DRVSTATUSRegister, "R")
+    }
+    
     def __init__(
         self,
         port: str,
@@ -78,13 +94,16 @@ class TMC2208UART:
                 byte >>= 1
         return crc
 
-    def read_register(self, register: int) -> int:
+    def read_register_addr(self, reg_addr: int) -> int:
         """
         Sends a read request for the specified register and returns its value.
+        
+        This is a low-level function. For easier use, `read_register()`
+        is recommended. 
 
         Parameters
         ----------
-        register : int
+        reg_addr : int
             Address of the register to read.
 
         Returns
@@ -100,27 +119,26 @@ class TMC2208UART:
         if not self.serial or not self.serial.is_open:
             raise IOError("Serial port is not open.")
 
-        request = [0x05, self.slave_address, register & 0x7F]
+        request = [0x05, self.slave_address, reg_addr & 0x7F]
         request.append(self._calculate_crc(request))
 
-        self.serial.write(bytes(request))
-        self.serial.flush()
-
-        response = self.serial.read(12)
+        self.serial.reset_input_buffer()   # clear RX-buffer
+        self.serial.write(bytes(request))  # write request
+        self.serial.flush()                # send full request
+        time.sleep(0.005)
+        response = self.serial.read(12)    # wait for answer 
+        
         if len(response) < 12:
             raise IOError("Incomplete response received from driver.")
 
-        response = response[4:]  # Skip echo (first 4 bytes)
-
+        response = response[4:]  # skip echo (first 4 bytes)
+                
         if response[0] != 0x05:
             raise IOError(f"Invalid sync byte in response: 0x{response[0]:02X}")
-
         if response[1] != 0xFF:
             raise IOError(f"Invalid master address: 0x{response[1]:02X}")
-
-        if response[2] != (register & 0x7F):
+        if response[2] != (reg_addr & 0x7F):
             raise IOError(f"Unexpected register address in response: 0x{response[2]:02X}")
-
         if self._calculate_crc(list(response[:7])) != response[7]:
             raise IOError("CRC check failed for received response.")
 
@@ -132,13 +150,16 @@ class TMC2208UART:
         )
         return value
 
-    def write_register(self, register: int, value: int) -> None:
+    def write_register_addr(self, reg_addr: int, value: int) -> None:
         """
         Writes a 32-bit value to the specified register.
-
+        
+        This is a low-level function. For easier use, `write_register()`
+        is recommended. 
+        
         Parameters
         ----------
-        register : int
+        reg_addr : int
             Address of the register to write.
         value : int
             32-bit value to write into the register.
@@ -154,7 +175,7 @@ class TMC2208UART:
         datagram = [
             0x05,                    # Sync
             self.slave_address,      # Slave address
-            register | 0x80,         # Write bit (MSB set)
+            reg_addr | 0x80,         # Write bit (MSB set)
             (value >> 24) & 0xFF,    # Data byte 1 (MSB)
             (value >> 16) & 0xFF,    # Data byte 2
             (value >> 8) & 0xFF,     # Data byte 3
@@ -166,13 +187,16 @@ class TMC2208UART:
         self.serial.write(bytes(datagram))
         self.serial.flush()
 
-    def update_register_bits(self, register: int, mask: int, value: int) -> None:
+    def update_register_addr(self, reg_addr: int, mask: int, value: int) -> None:
         """
         Updates selected bits in a register using a read–modify–write operation.
-    
+        
+        This is a low-level function. For easier use, `update_register()`
+        is recommended. 
+        
         Parameters
         ----------
-        register : int
+        reg_addr : int
             Address of the register to update.
         mask : int
             Bitmask that defines which bits should be updated (1 = modify).
@@ -184,6 +208,122 @@ class TMC2208UART:
         IOError
             If reading or writing the register fails.
         """
-        current = self.read_register(register)
+        current = self.read_register_addr(reg_addr)
         new_value = (current & ~mask) | (value & mask)
-        self.write_register(register, new_value)
+        self.write_register_addr(reg_addr, new_value)
+
+    def update_register(self, reg_name: str, fields: dict[str, int]) -> None:
+        """
+        Updates specific fields in a register by key, based on a layout
+        defined in the associated dataclass.
+
+        Parameters
+        ----------
+        reg_name : str
+            Name of the register (e.g., "CHOPCONF").
+        fields : dict[str, int]
+            Mapping of field names to values (e.g., {"toff": 3, "mres": 5}).
+
+        Raises
+        ------
+        ValueError
+            If register or field key is unknown, or value is too large.
+        IOError
+            If reading or writing the register fails.
+        """
+        if reg_name not in self.REGISTER_CLASS_MAP:
+            raise ValueError(f"Unknown register '{reg_name}'")
+
+        addr, reg_class, access = self.REGISTER_CLASS_MAP[reg_name]
+        if "W" not in access:
+            raise IOError(f"Register '{reg_name}' is not writeable.")
+        if "R" not in access:
+            raise IOError(
+                f"Register '{reg_name}' is not readable, "
+                f"so it cannot be updated partially."
+            )
+        
+        current = self.read_register(reg_name)
+        layout = reg_class.field_layout()
+
+        for key, new_value in fields.items():
+            if key not in layout:
+                raise ValueError(
+                    f"Invalid field '{key}' for register '{reg_name}'"
+                )
+            width = layout[key][1]
+            if isinstance(new_value, bool):
+                new_value = int(new_value)
+
+            if not (0 <= new_value < (1 << width)):
+                raise ValueError(f"Value {new_value} is out of range for field '{key}'")
+
+            setattr(current, key, new_value)
+
+        # Write the modified `Register` object back to the driver's register
+        self.write_register(reg_name, current)
+
+    def read_register(self, reg_name: str) -> Register:
+        """
+        Reads the given register and returns an instance of the associated dataclass.
+
+        Parameters
+        ----------
+        reg_name : str
+            Name of the register (e.g., "GCONF", "CHOPCONF").
+
+        Returns
+        -------
+        Register
+            An instance of the register dataclass, e.g., GCONFRegister.
+
+        Raises
+        ------
+        ValueError
+            If the register or parser is unknown.
+        IOError
+            If the register cannot be read.
+        """
+        if reg_name not in self.REGISTER_CLASS_MAP:
+            raise ValueError(f"Unknown register '{reg_name}'")
+
+        addr, reg_class, access = self.REGISTER_CLASS_MAP[reg_name]
+        if "R" not in access:
+            raise IOError(f"Register '{reg_name}' is not readable")
+        
+        value = self.read_register_addr(addr)
+        return reg_class.from_int(value)
+
+    def write_register(self, reg_name: str, reg_obj: Register) -> None:
+        """
+        Writes the full contents of a register using the field values in a 
+        dataclass.
+
+        Parameters
+        ----------
+        reg_name : str
+            Name of the register (e.g., "GCONF", "CHOPCONF").
+        reg_obj : Register
+            Instance of the corresponding register containing all field values.
+
+        Raises
+        ------
+        ValueError
+            If the register is unknown or the object doesn't match.
+        IOError
+            If writing to the register fails.
+        """
+        if reg_name not in self.REGISTER_CLASS_MAP:
+            raise ValueError(f"Unknown register '{reg_name}'")
+
+        addr, reg_class, access = self.REGISTER_CLASS_MAP[reg_name]
+        if "W" not in access:
+            raise IOError(f"Register '{reg_name}' is not writeable.")
+        
+        if not isinstance(reg_obj, reg_class):
+            raise ValueError(
+                f"Expected instance of {reg_class.__name__}, "
+                f"got {type(reg_obj).__name__}"
+            )
+
+        self.write_register_addr(addr, reg_obj.to_int())

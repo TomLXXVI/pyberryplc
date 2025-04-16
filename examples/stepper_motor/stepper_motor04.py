@@ -16,10 +16,9 @@ class StepperUARTTestPLC(AbstractPLC):
             step_pin=27,
             dir_pin=26,
             steps_per_revolution=200,
+            uart=TMC2208UART(port="/dev/ttyAMA0"),
             logger=self.logger
         )
-        
-        self.uart = TMC2208UART(port="/dev/ttyAMA0")
 
         self.X0 = self.add_marker("X0")
         self.X1 = self.add_marker("X1")
@@ -30,18 +29,8 @@ class StepperUARTTestPLC(AbstractPLC):
     def _init_control(self):
         if self.input_flag:
             self.input_flag = False
-        
-            self.logger.info("Initializing stepper via UART...")
-            self.uart.open()
-            try:
-                # toff = 3, mres = 5 (1/8 microstepping)
-                mask = 0xF | (0xF << 24)
-                value = 3 | (5 << 24)
-                self.uart.update_register_bits(0x6C, mask, value)
-                self.logger.info("CHOPCONF configured.")
-            except IOError as e:
-                self.logger.error(f"UART config failed: {e}")
-            
+            self.stepper.enable()
+            self.stepper.set_microstepping("1/16")
             self.X0.activate()
     
     def _sequence_control(self):
@@ -75,16 +64,11 @@ class StepperUARTTestPLC(AbstractPLC):
     
     def exit_routine(self):
         self.logger.info("Exiting... disabling driver.")
-        try:
-            self.uart.update_register_bits(0x6C, 0xF, 0)
-        except IOError as e:
-            self.logger.warning(f"Could not disable driver: {e}")
-        self.uart.close()
+        self.stepper.disable()
 
     def emergency_routine(self):
         pass
     
-
 
 if __name__ == "__main__":
     os.system("clear")

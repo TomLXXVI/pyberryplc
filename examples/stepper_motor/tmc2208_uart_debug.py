@@ -1,5 +1,5 @@
 import serial
-
+import time
 
 def calculate_crc(data: list[int]) -> int:
     crc = 0
@@ -68,6 +68,8 @@ def read_register(uart, register: int, slave_address: int = 0x00) -> None:
 if __name__ == "__main__":
     uart = serial.Serial(port="/dev/ttyAMA0", baudrate=115200, timeout=0.5)
     try:
-        read_register(uart, register=0x6C)  # GCONF
+        for _ in range(2):
+            read_register(uart, register=0x6C)
+            time.sleep(0.1)
     finally:
         uart.close()

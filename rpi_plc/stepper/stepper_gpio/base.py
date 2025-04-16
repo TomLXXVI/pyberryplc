@@ -9,17 +9,23 @@ class StepperMotor(ABC):
     """
     Abstract base class for a stepper motor controlled via GPIO.
     """
-
     MICROSTEP_FACTORS: dict[str, int] = {
         "full": 1,
         "1/2": 2,
         "1/4": 4,
         "1/8": 8,
         "1/16": 16,
+        "1/32": 32,
+        "1/64": 64,
+        "1/128": 128,
+        "1/256": 256
     }
 
     def __init__(
         self,
+        step_pin: int,
+        dir_pin: int,
+        enable_pin: int | None = None,
         steps_per_revolution: int = 200,
         logger: logging.Logger | None = None
     ) -> None:
@@ -28,18 +34,36 @@ class StepperMotor(ABC):
 
         Parameters
         ----------
+        step_pin : int
+            GPIO pin connected to the STEP input of the driver.
+        dir_pin : int
+            GPIO pin connected to the DIR input of the driver.
+        enable_pin : int | None, optional
+            GPIO pin connected to the EN input of the driver (active low).
         steps_per_revolution : int, optional
             Number of full steps per motor revolution. Default is 200.
         logger : logging.Logger | None, optional
             Logger instance for debug/info output.
         """
+        self.step = DigitalOutput(step_pin, label="STEP", active_high=True)
+        self.dir = DigitalOutput(dir_pin, label="DIR", active_high=True)
+        self._enable = DigitalOutput(enable_pin, label="EN", active_high=False) if enable_pin is not None else None
         self.steps_per_revolution = steps_per_revolution
-        self.step: DigitalOutput | None = None
-        self.dir: DigitalOutput | None = None
-        self.enable: DigitalOutput | None = None
-        self.microstep_mode: str = "full"
         self.logger = logger or logging.getLogger(__name__)
-
+        self.microstep_mode: str = "full"
+    
+    def enable(self) -> None:
+        """Enable the stepper driver (if enable pin is configured)."""
+        if self._enable:
+            self._enable.write(True)
+            self.logger.info(f"[{self.__class__.__name__}] Driver enabled")
+    
+    def disable(self) -> None:
+        """Disable the stepper driver (if enable pin is configured)."""
+        if self._enable:
+            self._enable.write(False)
+            self.logger.info(f"[{self.__class__.__name__}] Driver disabled")
+    
     @abstractmethod
     def set_microstepping(self, mode: str) -> None:
         pass
@@ -69,6 +93,12 @@ class StepperMotor(ABC):
             enables acceleration and deceleration during the motion. 
         """
         factor = self.MICROSTEP_FACTORS.get(self.microstep_mode, 1)
+
+        self.logger.info(
+            f"[{self.__class__.__name__}] "
+            f"Microstep mode = {self.microstep_mode} (factor = {factor})"
+        )
+        
         steps_per_degree = self.steps_per_revolution * factor / 360
         steps = int(degrees * steps_per_degree)
         step_rate = angular_speed * steps_per_degree  # in steps/sec
@@ -84,8 +114,8 @@ class StepperMotor(ABC):
             delays = [delay] * steps
 
         self.logger.info(
-            f"[{self.__class__.__name__}] Rotating {direction}: {steps} steps "
-            f"over {degrees:.1f}° at "
+            f"[{self.__class__.__name__}] "
+            f"Rotating {direction}: {steps} steps over {degrees:.1f}° at "
             f"{'profiled speed' if profile else f'{angular_speed:.1f}°/s'}"
         )
 
@@ -94,9 +124,3 @@ class StepperMotor(ABC):
             time.sleep(delay)
             self.step.write(False)
             time.sleep(delay)
-
-    def disable(self) -> None:
-        """Disable the stepper driver (if enable pin is configured)."""
-        if self.enable:
-            self.enable.write(False)
-            self.logger.info(f"[{self.__class__.__name__}] Driver disabled")
