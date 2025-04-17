@@ -19,7 +19,6 @@ class PLC(AbstractPLC):
             enable_pin=19,
             ms1_pin=13,
             ms2_pin=21,
-            microstep_mode="1/16",
             steps_per_revolution=200,
             logger=self.logger
         )

@@ -7,7 +7,7 @@ from rpi_plc.stepper.stepper_uart import TMC2208UART
 
 class TMC2208StepperMotor(StepperMotor):
     """
-    Stepper motor controlled via a TMC2208 driver and GPIO.
+    Stepper motor controlled via a TMC2208 driver and GPIO/UART.
     Supports basic microstepping configuration via MS1 and MS2 pins.
     """
 
@@ -64,9 +64,7 @@ class TMC2208StepperMotor(StepperMotor):
                 reg_name="CHOPCONF", 
                 fields={"toff": 3}
             )
-            self.logger.info(
-                f"[{self.__class__.__name__}] Driver enabled"
-            )
+            self.logger.info("Driver enabled")
         else:
             super().enable()
     
@@ -76,15 +74,8 @@ class TMC2208StepperMotor(StepperMotor):
                 reg_name="CHOPCONF", 
                 fields={"toff": 0}
             )
-            
-            # debug
-            gconf = self.uart.read_register("CHOPCONF")
-            self.logger.info(f"CHOPCONF-readout after disabling: {gconf}")
-            
             self.uart.close()
-            self.logger.info(
-                f"[{self.__class__.__name__}] Driver disabled"
-            )
+            self.logger.info("Driver disabled")
         else:
             super().disable()
     
@@ -127,12 +118,10 @@ class TMC2208StepperMotor(StepperMotor):
             self.ms2.write(ms2_val)
             self.microstep_mode = mode
             self.logger.info(
-                f"[{self.__class__.__name__}] "
                 f"Microstepping set to {mode} (MS1={ms1_val}, MS2={ms2_val})"
             )
         else:
             self.logger.warning(
-                f"[{self.__class__.__name__}] "
                 f"MS1/MS2 pins not configured, skipping microstepping setup"
             )
 
@@ -150,14 +139,12 @@ class TMC2208StepperMotor(StepperMotor):
         }
         if mode not in config:
             raise ValueError(f"Invalid microstepping mode: {mode}")
-                
         mres = config[mode]
-        self.logger.info(
-            f"[{self.__class__.__name__}] "
-            f"Setting microstepping via UART: {mode} (mres = {mres})"
-        )
         self.uart.update_register(
             reg_name="CHOPCONF", 
             fields={"mres": mres}
         )
         self.microstep_mode = mode
+        self.logger.info(
+            f"Setting microstepping via UART: {mode} (mres = {mres})"
+        )

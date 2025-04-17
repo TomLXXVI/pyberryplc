@@ -56,13 +56,13 @@ class StepperMotor(ABC):
         """Enable the stepper driver (if enable pin is configured)."""
         if self._enable:
             self._enable.write(True)
-            self.logger.info(f"[{self.__class__.__name__}] Driver enabled")
+            self.logger.info("Driver enabled")
     
     def disable(self) -> None:
         """Disable the stepper driver (if enable pin is configured)."""
         if self._enable:
             self._enable.write(False)
-            self.logger.info(f"[{self.__class__.__name__}] Driver disabled")
+            self.logger.info("Driver disabled")
     
     @abstractmethod
     def set_microstepping(self, mode: str) -> None:
@@ -93,12 +93,6 @@ class StepperMotor(ABC):
             enables acceleration and deceleration during the motion. 
         """
         factor = self.MICROSTEP_FACTORS.get(self.microstep_mode, 1)
-
-        self.logger.info(
-            f"[{self.__class__.__name__}] "
-            f"Microstep mode = {self.microstep_mode} (factor = {factor})"
-        )
-        
         steps_per_degree = self.steps_per_revolution * factor / 360
         steps = int(degrees * steps_per_degree)
         step_rate = angular_speed * steps_per_degree  # in steps/sec
@@ -114,7 +108,6 @@ class StepperMotor(ABC):
             delays = [delay] * steps
 
         self.logger.info(
-            f"[{self.__class__.__name__}] "
             f"Rotating {direction}: {steps} steps over {degrees:.1f}° at "
             f"{'profiled speed' if profile else f'{angular_speed:.1f}°/s'}"
         )
