@@ -1,4 +1,4 @@
-# rpi-gpio
+# pyberryplc
 
 A modular Python package for developing PLC-like applications on the Raspberry Pi.  
 Supports digital I/O, timers, counters, edge detection, and stepper motor control via GPIO or UART.
