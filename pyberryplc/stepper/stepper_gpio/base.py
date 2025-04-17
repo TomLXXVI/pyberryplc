@@ -1,14 +1,20 @@
 import time
 import logging
 from abc import ABC, abstractmethod
+from collections import deque
 from pyberryplc.core.gpio import DigitalOutput
 from .speed_profiles import SpeedProfile
 
 
 class StepperMotor(ABC):
     """
-    Abstract base class for a stepper motor controlled via GPIO.
+    Abstract base class for a stepper motor controlled via GPIO, with 
+    non-blocking motion control.
+
+    This class provides the foundation for implementing stepper motor drivers
+    that execute rotations asynchronously using periodic update calls.
     """
+
     MICROSTEP_FACTORS: dict[str, int] = {
         "full": 1,
         "1/2": 2,
@@ -30,7 +36,7 @@ class StepperMotor(ABC):
         logger: logging.Logger | None = None
     ) -> None:
         """
-        Initialize the abstract StepperMotor.
+        Initialize the StepperMotor instance.
 
         Parameters
         ----------
@@ -40,10 +46,10 @@ class StepperMotor(ABC):
             GPIO pin connected to the DIR input of the driver.
         enable_pin : int | None, optional
             GPIO pin connected to the EN input of the driver (active low).
-        steps_per_revolution : int, optional
-            Number of full steps per motor revolution. Default is 200.
+        steps_per_revolution : int
+            Number of full steps per revolution.
         logger : logging.Logger | None, optional
-            Logger instance for debug/info output.
+            Logger for debug output.
         """
         self.step = DigitalOutput(step_pin, label="STEP", active_high=True)
         self.dir = DigitalOutput(dir_pin, label="DIR", active_high=True)
@@ -51,24 +57,42 @@ class StepperMotor(ABC):
         self.steps_per_revolution = steps_per_revolution
         self.logger = logger or logging.getLogger(__name__)
         self.microstep_mode: str = "full"
-    
+
+        # State for non-blocking motion control
+        self._busy = False
+        self._next_step_time = 0.0
+        self._delays = deque()
+
     def enable(self) -> None:
-        """Enable the stepper driver (if enable pin is configured)."""
+        """Enable the stepper driver (if EN pin is defined)."""
         if self._enable:
             self._enable.write(True)
-            self.logger.info("Driver enabled")
-    
+            self.logger.debug("Driver enabled")
+
     def disable(self) -> None:
-        """Disable the stepper driver (if enable pin is configured)."""
+        """Disable the stepper driver (if EN pin is defined)."""
         if self._enable:
             self._enable.write(False)
-            self.logger.info("Driver disabled")
-    
+            self.logger.debug("Driver disabled")
+
+    @property
+    def busy(self) -> bool:
+        """Return whether the motor is currently executing a motion."""
+        return self._busy
+
     @abstractmethod
     def set_microstepping(self, mode: str) -> None:
+        """
+        Set the microstepping mode.
+
+        Parameters
+        ----------
+        mode : str
+            Microstepping mode (e.g., "full", "1/8", "1/16", etc.)
+        """
         pass
 
-    def rotate(
+    def start_rotation(
         self,
         degrees: float,
         direction: str = "forward",
@@ -76,44 +100,73 @@ class StepperMotor(ABC):
         profile: SpeedProfile | None = None
     ) -> None:
         """
-        Rotate the motor a specified number of degrees.
+        Start a new rotation asynchronously.
 
         Parameters
         ----------
         degrees : float
-            The rotation angle in degrees.
+            Target rotation angle in degrees.
         direction : str, optional
             Either "forward" or "backward". Default is "forward".
         angular_speed : float, optional
-            Constant angular speed in degrees per second (used if no profile is 
-            given). Default is 90.0.
-        profile : SpeedProfile, optional
-            Speed profile that defines the delay between step pulses.  
-            If provided, it overrides the default fixed-speed behavior and 
-            enables acceleration and deceleration during the motion. 
+            Constant angular speed (deg/s) if no profile is given.
+        profile : SpeedProfile | None, optional
+            Speed profile to define step delays.
         """
-        factor = self.MICROSTEP_FACTORS.get(self.microstep_mode, 1)
-        steps_per_degree = self.steps_per_revolution * factor / 360
-        steps = int(degrees * steps_per_degree)
-        step_rate = angular_speed * steps_per_degree  # in steps/sec
-        
-        self.dir.write(direction == "forward")
+        if self.busy:
+            self.logger.warning("Motor is busy — rotation ignored.")
+            return
+
+        self._set_direction(direction)
+        total_steps = int((degrees / 360.0) * self.steps_per_revolution * self._microstep_factor())
 
         if profile:
-            profile.set_conversion_factor(steps_per_degree)
             delays = profile.get_delays(degrees)
+            if len(delays) != total_steps:
+                raise ValueError("Mismatch between number of steps and number of delays")
+            self._delays = deque(delays)
         else:
-            # constant speed = constant delay
-            delay = 1.0 / step_rate / 2
-            delays = [delay] * steps
+            step_delay = 1.0 / (angular_speed * self._microstep_factor() / 360.0)
+            self._delays = deque([step_delay] * total_steps)
 
-        self.logger.info(
-            f"Rotating {direction}: {steps} steps over {degrees:.1f}° at "
-            f"{'profiled speed' if profile else f'{angular_speed:.1f}°/s'}"
-        )
+        self._next_step_time = time.time()
+        self._busy = True
 
-        for delay in delays:
-            self.step.write(True)
-            time.sleep(delay)
-            self.step.write(False)
-            time.sleep(delay)
+    def update(self) -> None:
+        """
+        Perform a single step if the time is right.
+        Should be called regularly within the PLC scan cycle.
+        """
+        if not self._busy:
+            return
+
+        now = time.time()
+        if now >= self._next_step_time and self._delays:
+            self._pulse_step_pin()
+            if self._delays:
+                self._next_step_time = now + self._delays.popleft()
+            if not self._delays:
+                self._busy = False
+
+    def _pulse_step_pin(self) -> None:
+        """Generate a short pulse on the STEP pin (10 microseconds)."""
+        self.step.write(True)
+        time.sleep(0.00001)  # 10 µs pulse
+        self.step.write(False)
+
+    def _set_direction(self, direction: str) -> None:
+        """
+        Set motor direction.
+
+        Parameters
+        ----------
+        direction : str
+            Either "forward" or "backward"
+        """
+        if direction not in ("forward", "backward"):
+            raise ValueError("Direction must be 'forward' or 'backward'")
+        self.dir.write(direction == "forward")
+
+    def _microstep_factor(self) -> int:
+        """Return the integer microstepping factor based on current mode."""
+        return self.MICROSTEP_FACTORS.get(self.microstep_mode, 1)
