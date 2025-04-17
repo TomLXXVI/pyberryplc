@@ -1,7 +1,7 @@
 import os
-from rpi_plc.core import AbstractPLC, MemoryVariable
-from rpi_plc.core.switches import ToggleSwitch
-from rpi_plc.log_utils import init_logger
+from pyberryplc.core import AbstractPLC, MemoryVariable
+from pyberryplc.core.switches import ToggleSwitch
+from pyberryplc.log_utils import init_logger
 
 
 class LedPLC(AbstractPLC):

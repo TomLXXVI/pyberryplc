@@ -6,7 +6,7 @@ import time
 import logging
 from datetime import datetime
 
-from rpi_plc.core.gpio import PWMOutput, DigitalOutput
+from pyberryplc.core.gpio import PWMOutput, DigitalOutput
 
 log_dir = "/shared/python-projects/rpi-gpio/applications/sprout_machine/logs"
 os.makedirs(log_dir, exist_ok=True)

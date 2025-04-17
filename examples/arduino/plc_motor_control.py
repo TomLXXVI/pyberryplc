@@ -1,9 +1,9 @@
 import os
-from rpi_plc.core import AbstractPLC
-from rpi_plc.remote_interface import SerialRemoteDeviceClient
-from rpi_plc.core.timers import TimerOnDelay
-from rpi_plc.log_utils import init_logger
-from rpi_plc.core.exceptions import EmergencyException
+from pyberryplc.core import AbstractPLC
+from pyberryplc.remote_interface import SerialRemoteDeviceClient
+from pyberryplc.core.timers import TimerOnDelay
+from pyberryplc.log_utils import init_logger
+from pyberryplc.core.exceptions import EmergencyException
 
 
 class MotorControlPLC(AbstractPLC):

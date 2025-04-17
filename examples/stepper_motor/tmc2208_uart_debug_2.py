@@ -1,4 +1,4 @@
-from rpi_plc.stepper.stepper_uart import TMC2208UART
+from pyberryplc.stepper.stepper_uart import TMC2208UART
 
 
 def test():

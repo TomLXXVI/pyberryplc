@@ -1,7 +1,7 @@
 import os
-from rpi_plc.core.plc import AbstractPLC
-from rpi_plc.remote_interface import TCPRemoteDeviceClient
-from rpi_plc.log_utils import init_logger
+from pyberryplc.core.plc import AbstractPLC
+from pyberryplc.remote_interface import TCPRemoteDeviceClient
+from pyberryplc.log_utils import init_logger
 
 
 class ServoControlPLC(AbstractPLC):

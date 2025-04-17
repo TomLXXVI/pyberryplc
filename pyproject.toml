@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rpi-gpio"
+name = "pyberryplc"
 version = "0.1.0"
 description = "PLC-programming with Python on Raspberry Pi"
 readme = "README.md"
@@ -25,4 +25,3 @@ classifiers = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["rpi_plc*"]

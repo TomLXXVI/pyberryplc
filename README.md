@@ -1,4 +1,4 @@
-# rpi-gpio
+# pyberryplc
 
 A modular Python package for developing PLC-like applications on the Raspberry Pi.  
 Supports digital I/O, timers, counters, edge detection, and stepper motor control via GPIO or UART.
@@ -18,7 +18,7 @@ Supports digital I/O, timers, counters, edge detection, and stepper motor contro
 ## 🧱 Project structure
 
 ```
-rpi_plc/
+pyberryplc/
 ├── core/              # PLC core logic: gpio, timers, counters, switches
 ├── stepper/           # Stepper motor control (GPIO and UART)
 │   ├── stepper_gpio/
@@ -32,8 +32,8 @@ rpi_plc/
 ## 📦 Installation (for development)
 
 ```bash
-git clone https://github.com/yourusername/rpi-gpio.git
-cd rpi-gpio
+git clone https://github.com/yourusername/pyberryplc.git
+cd pyberryplc
 pip install -e .
 ```
 
@@ -42,8 +42,8 @@ Requires Python 3.11 or higher.
 ## 🧪 Example usage
 
 ```python
-from rpi_plc.core import AbstractPLC, DigitalInput, DigitalOutput, TimerOnDelay
-from rpi_plc.stepper import A4988StepperMotor
+from pyberryplc.core import AbstractPLC, DigitalInput, DigitalOutput, TimerOnDelay
+from pyberryplc.stepper import A4988StepperMotor
 ```
 
 See the `examples/` folder for test scripts and sample PLC applications.

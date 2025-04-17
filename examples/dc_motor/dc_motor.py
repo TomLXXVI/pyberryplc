@@ -1,7 +1,7 @@
 import os
-from rpi_plc.core import AbstractPLC
-from rpi_plc.core.switches import ToggleSwitch
-from rpi_plc.log_utils import init_logger
+from pyberryplc.core import AbstractPLC
+from pyberryplc.core.switches import ToggleSwitch
+from pyberryplc.log_utils import init_logger
 
 
 class PLC(AbstractPLC):

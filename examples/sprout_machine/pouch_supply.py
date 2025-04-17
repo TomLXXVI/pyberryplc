@@ -1,11 +1,11 @@
 import os
 import subprocess
-from rpi_plc.core import AbstractPLC
-from rpi_plc.core.switches import ToggleSwitch
-from rpi_plc.core.timers import TimerOnDelay
-from rpi_plc.core.counters import CounterUp
-from rpi_plc.remote_interface import TCPRemoteDeviceClient
-from rpi_plc.log_utils import init_logger
+from pyberryplc.core import AbstractPLC
+from pyberryplc.core.switches import ToggleSwitch
+from pyberryplc.core.timers import TimerOnDelay
+from pyberryplc.core.counters import CounterUp
+from pyberryplc.remote_interface import TCPRemoteDeviceClient
+from pyberryplc.log_utils import init_logger
 
 
 class PLC(AbstractPLC):

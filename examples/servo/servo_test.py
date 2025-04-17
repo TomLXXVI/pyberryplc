@@ -1,5 +1,5 @@
 import time
-from rpi_plc.core.gpio import PWMOutput
+from pyberryplc.core.gpio import PWMOutput
 from signal import pause
 
 

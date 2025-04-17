@@ -1,6 +1,6 @@
 import logging
-from rpi_plc.core.gpio import DigitalOutput
-from rpi_plc.stepper.stepper_gpio.base import StepperMotor
+from pyberryplc.core.gpio import DigitalOutput
+from pyberryplc.stepper.stepper_gpio.base import StepperMotor
 
 
 class A4988StepperMotor(StepperMotor):

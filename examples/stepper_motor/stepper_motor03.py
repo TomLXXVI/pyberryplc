@@ -1,8 +1,8 @@
 import os
-from rpi_plc.core import AbstractPLC
-from rpi_plc.log_utils import init_logger
-from rpi_plc.stepper.stepper_gpio import TMC2208StepperMotor
-from rpi_plc.stepper.stepper_gpio import TrapezoidalProfile
+from pyberryplc.core import AbstractPLC
+from pyberryplc.log_utils import init_logger
+from pyberryplc.stepper.stepper_gpio import TMC2208StepperMotor
+from pyberryplc.stepper.stepper_gpio import TrapezoidalProfile
 
 from keyboard_input import KeyInput
 

@@ -4,7 +4,7 @@ import signal
 import logging
 from dataclasses import dataclass
 from gpiozero.pins.pigpio import PiFactory
-from rpi_plc.utils import EmailNotification
+from pyberryplc.utils import EmailNotification
 from .gpio import GPIO, DigitalInput, DigitalOutput, PWMOutput
 from .exceptions import ConfigurationError, InternalCommunicationError, EmergencyException
 

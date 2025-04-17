@@ -1,8 +1,8 @@
 import logging
 import time
-from rpi_plc.core.gpio import DigitalOutput
-from rpi_plc.stepper.stepper_gpio import StepperMotor
-from rpi_plc.stepper.stepper_uart import TMC2208UART
+from pyberryplc.core.gpio import DigitalOutput
+from pyberryplc.stepper.stepper_gpio import StepperMotor
+from pyberryplc.stepper.stepper_uart import TMC2208UART
 
 
 class TMC2208StepperMotor(StepperMotor):
