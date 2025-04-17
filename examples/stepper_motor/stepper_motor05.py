@@ -93,6 +93,9 @@ class StepperUARTTestPLC(AbstractPLC):
 
     def emergency_routine(self):
         pass
+    
+    def crash_routine(self, exception: Exception) -> None:
+        self.exit_routine()
 
 
 if __name__ == "__main__":

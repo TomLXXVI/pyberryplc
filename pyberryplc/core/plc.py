@@ -118,7 +118,7 @@ class AbstractPLC(ABC):
     running on a Raspberry Pi.
 
     To write a specific PLC application, the user needs to write its own class
-    derived from this base class and implementing the abstract methods of this 
+    derived from this base class and implement the abstract methods of this 
     base class.
     """
     def __init__(
@@ -408,6 +408,10 @@ class AbstractPLC(ABC):
             self.int_com_error_handler(error)
     
     def update_registries(self):
+        """At the beginning of each new scan cycle the values in the 
+        current state location of the memory variables and output variables are
+        moved to the previous state location. This allows for edge detection.
+        """
         for marker in self.marker_registry.values():
             marker.update(marker.curr_state)
         for output in self.output_registry.values():
@@ -460,21 +464,31 @@ class AbstractPLC(ABC):
         """
         ...
 
+    @abstractmethod
+    def crash_routine(self, exception: Exception) -> None:
+        """Handles unexpected runtime exceptions."""
+        pass
+
     def run(self):
         """Implements the global running operation of the PLC."""
-        while not self._exit:
-            try:
-                self.update_registries()
-                self.read_inputs()
-                self.control_routine()
-            except EmergencyException:
-                self.emergency_routine()
-                return
-            finally:
+        try:
+            while not self._exit:
+                try:
+                    self.update_registries()
+                    self.read_inputs()
+                    self.control_routine()
+                except EmergencyException:
+                    self.logger.warning("Emergency stop triggered.")
+                    self.emergency_routine()
+                    return
+                finally:
+                    self.write_outputs()
+            else:
+                self.exit_routine()
                 self.write_outputs()
-        else:
-            # Executed when the while condition has become `False`, but not when
-            # the while loop has been interrupted by the `return` statement in
-            # the `EmergencyException` clause
-            self.exit_routine()
-            self.write_outputs()
+        except Exception as e:
+            self.logger.exception(
+                "Unexpected exception occurred. "
+                "Entering crash routine."
+            )
+            self.crash_routine(e)
