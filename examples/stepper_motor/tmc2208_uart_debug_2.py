@@ -7,9 +7,9 @@ def test():
         uart.read_register("CHOPCONF")
         print("second read: ")
         uart.read_register("CHOPCONF")
-        print("first update: ")
+        print("first do_single_step: ")
         uart.update_register("CHOPCONF", {"toff": 3})
-        print("second update: ")
+        print("second do_single_step: ")
         uart.update_register("CHOPCONF", {"mres": 5})
 
 

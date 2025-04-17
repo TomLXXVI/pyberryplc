@@ -18,7 +18,7 @@ class TMC2208StepperMotor(StepperMotor):
         enable_pin: int | None = None,
         ms1_pin: int | None = None,
         ms2_pin: int | None = None,
-        steps_per_revolution: int = 200,
+        full_steps_per_rev: int = 200,
         uart: TMC2208UART | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -37,14 +37,14 @@ class TMC2208StepperMotor(StepperMotor):
             GPIO pin connected to MS1 for microstepping control.
         ms2_pin : int | None, optional
             GPIO pin connected to MS2 for microstepping control.
-        steps_per_revolution : int, optional
+        full_steps_per_rev : int, optional
             Number of full steps per motor revolution. Default is 200.
         uart: TMC2208UART | None, optional
             UART-interface for register-based configuration.
         logger : logging.Logger | None, optional
             Logger instance for debug/info output.
         """
-        super().__init__(step_pin, dir_pin, enable_pin, steps_per_revolution, logger)
+        super().__init__(step_pin, dir_pin, enable_pin, full_steps_per_rev, logger)
         self.ms1 = DigitalOutput(ms1_pin, label="MS1") if ms1_pin is not None else None
         self.ms2 = DigitalOutput(ms2_pin, label="MS2") if ms2_pin is not None else None
         self.uart = uart

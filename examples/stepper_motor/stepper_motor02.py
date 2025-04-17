@@ -15,7 +15,7 @@ motor = TMC2208StepperMotor(
     ms1_pin=MS1_PIN,
     ms2_pin=MS2_PIN,
     microstep_mode="1/8",
-    steps_per_revolution=200
+    full_steps_per_rev=200
 )
 
 # Trapeziumprofiel parameters

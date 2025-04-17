@@ -17,7 +17,7 @@ class A4988StepperMotor(StepperMotor):
         ms1_pin: int | None = None,
         ms2_pin: int | None = None,
         ms3_pin: int | None = None,
-        steps_per_revolution: int = 200,
+        full_steps_per_rev: int = 200,
         logger: logging.Logger | None = None
     ) -> None:
         """
@@ -37,12 +37,12 @@ class A4988StepperMotor(StepperMotor):
             GPIO pin connected to MS2 for microstepping control.
         ms3_pin : int | None, optional
             GPIO pin connected to MS3 for microstepping control.
-        steps_per_revolution : int, optional
+        full_steps_per_rev : int, optional
             Number of full steps per motor revolution. Default is 200.
         logger : logging.Logger | None, optional
             Logger instance for debug/info output.
         """
-        super().__init__(step_pin, dir_pin, enable_pin, steps_per_revolution, logger)
+        super().__init__(step_pin, dir_pin, enable_pin, full_steps_per_rev, logger)
         self.ms1 = DigitalOutput(ms1_pin, label="MS1") if ms1_pin is not None else None
         self.ms2 = DigitalOutput(ms2_pin, label="MS2") if ms2_pin is not None else None
         self.ms3 = DigitalOutput(ms3_pin, label="MS3") if ms3_pin is not None else None
