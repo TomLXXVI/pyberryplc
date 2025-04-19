@@ -7,7 +7,8 @@ from .tmc2208_registers import (
     GCONFRegister, 
     GSTATRegister,
     IOINRegister,
-    DRVSTATUSRegister
+    DRVSTATUSRegister,
+    IHOLDIRUNRegister
 )
 
 
@@ -36,7 +37,8 @@ class TMC2208UART:
         "GCONF": (0x00, GCONFRegister, "RW"),
         "GSTAT": (0x01, GSTATRegister, "RW"),
         "IOIN": (0x06, IOINRegister, "R"),
-        "DRV_STATUS": (0x6F, DRVSTATUSRegister, "R")
+        "DRV_STATUS": (0x6F, DRVSTATUSRegister, "R"),
+        "IHOLD_IRUN": (0x10, IHOLDIRUNRegister, "W")
     }
     
     def __init__(

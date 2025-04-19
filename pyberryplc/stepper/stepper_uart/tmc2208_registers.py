@@ -201,3 +201,30 @@ class DRVSTATUSRegister(Register):
     @classmethod
     def field_layout(cls) -> dict[str, tuple[int, int]]:
         pass
+
+
+@dataclass
+class IHOLDIRUNRegister(Register):
+    """
+    Parsed representation of the IHOLD_IRUN register (0x10).
+    See TMC2208 datasheet Rev. 1.13, Table 5.2.
+    """
+
+    ihold: int
+    irun: int
+    ihold_delay: int
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "ihold": self.ihold,
+            "irun": self.irun,
+            "ihold_delay": self.ihold_delay,
+        }
+
+    @classmethod
+    def field_layout(cls) -> dict[str, tuple[int, int]]:
+        return {
+            "ihold":       (0, 5),   # bits 4..0
+            "irun":        (8, 5),   # bits 12..8
+            "ihold_delay": (16, 4),  # bits 19..16
+        }
