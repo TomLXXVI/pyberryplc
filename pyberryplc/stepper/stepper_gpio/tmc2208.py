@@ -8,8 +8,16 @@ from pyberryplc.stepper.stepper_uart.tmc2208_registers import IHOLDIRUNRegister
 
 class TMC2208StepperMotor(StepperMotor):
     """
-    Stepper motor controlled via a TMC2208 driver and GPIO/UART.
-    Supports basic microstepping configuration via MS1 and MS2 pins.
+    Stepper motor controlled via a TMC2208 driver using either GPIO or UART.
+
+    This class supports:
+    - Full or partial UART configuration of driver registers
+    - GPIO-based microstepping via MS1/MS2 pins (fallback)
+    - UART-based microstepping and current control
+    - Optional high sensitivity current mode (vsense = 1)
+
+    The driver is enabled either through GPIO (enable pin) or via UART using 
+    register settings.
     """
 
     def __init__(
@@ -21,12 +29,38 @@ class TMC2208StepperMotor(StepperMotor):
         ms2_pin: int | None = None,
         full_steps_per_rev: int = 200,
         uart: TMC2208UART | None = None,
+        high_sensitivity: bool = False,
         logger: logging.Logger | None = None,
     ) -> None:
+        """
+        Initialize a stepper motor controlled by a TMC2208 driver.
+
+        Parameters
+        ----------
+        step_pin : int
+            GPIO pin used for STEP signal.
+        dir_pin : int
+            GPIO pin used for DIRECTION signal.
+        enable_pin : int | None, optional
+            GPIO pin used to enable the driver (if not using UART).
+        ms1_pin : int | None, optional
+            GPIO pin for MS1 microstepping control (GPIO mode).
+        ms2_pin : int | None, optional
+            GPIO pin for MS2 microstepping control (GPIO mode).
+        full_steps_per_rev : int
+            Number of full steps per motor revolution (default 200).
+        uart : TMC2208UART | None, optional
+            UART interface for register-level control of the driver.
+        high_sensitivity : bool, optional
+            If True, sets CHOPCONF.vsense = 1 for V_FS = 180 mV instead of 325 mV.
+        logger : logging.Logger | None, optional
+            Logger for debug output.
+        """
         super().__init__(step_pin, dir_pin, enable_pin, full_steps_per_rev, logger)
         self.ms1 = DigitalOutput(ms1_pin, label="MS1") if ms1_pin is not None else None
         self.ms2 = DigitalOutput(ms2_pin, label="MS2") if ms2_pin is not None else None
         self.uart = uart
+        self.high_sensitivity = high_sensitivity
 
     def enable(self) -> None:
         """
@@ -40,13 +74,19 @@ class TMC2208StepperMotor(StepperMotor):
         if self.uart is not None:
             self.uart.open()
             self.uart.update_register(
-                "GCONF", 
-                {"pdn_disable": True, "mstep_reg_select": True}
+                reg_name="GCONF", 
+                fields={
+                    "pdn_disable": True,        # PDN_UART input function disabled. 
+                    "mstep_reg_select": True    # Microstep resolution selected by MSTEP register
+                }
             )
             time.sleep(0.005)
             self.uart.update_register(
-                "CHOPCONF", 
-                {"toff": 3}
+                reg_name="CHOPCONF", 
+                fields={
+                    "toff": 3,  # enable driver - Off time setting controls duration of slow decay phase
+                    "vsense": self.high_sensitivity,
+                }
             )
             self.logger.info("Driver enabled")
         else:
@@ -62,8 +102,8 @@ class TMC2208StepperMotor(StepperMotor):
         """
         if self.uart is not None:
             self.uart.update_register(
-                "CHOPCONF", 
-                {"toff": 0}
+                reg_name="CHOPCONF", 
+                fields={"toff": 0}  # Driver disable, all bridges off
             )
             self.uart.close()
             self.logger.info("Driver disabled")
@@ -197,5 +237,6 @@ class TMC2208StepperMotor(StepperMotor):
             ihold_delay=ihold_delay
         ))
         self.logger.info(
-            f"UART current config set: IRUN={irun}/31, IHOLD={ihold}/31, DELAY={ihold_delay}"
+            f"UART current config set: IRUN={irun}/31, IHOLD={ihold}/31, "
+            f"DELAY={ihold_delay}"
         )
