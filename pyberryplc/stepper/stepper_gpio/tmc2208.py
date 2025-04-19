@@ -162,15 +162,25 @@ class TMC2208StepperMotor(StepperMotor):
             Hold current as a percentage (0–100).
         ihold_delay : int
             Delay before switching to hold current (0–15).
+        
+        Raises
+        ------
+        ValueError
+            If any of the input parameters are outside their allowed range.
+        RuntimeError
+            If no UART interface is configured.
         """
         if self.uart is None:
             raise RuntimeError(
                 "UART interface not available on this stepper motor."
             )
 
-        assert 0 <= run_current_pct <= 100
-        assert 0 <= hold_current_pct <= 100
-        assert 0 <= ihold_delay <= 15
+        if not (0 <= run_current_pct <= 100):
+            raise ValueError("run_current_pct must be between 0 and 100.")
+        if not (0 <= hold_current_pct <= 100):
+            raise ValueError("hold_current_pct must be between 0 and 100.")
+        if not (0 <= ihold_delay <= 15):
+            raise ValueError("ihold_delay must be between 0 and 15.")
 
         irun = round(run_current_pct / 100 * 31)
         ihold = round(hold_current_pct / 100 * 31)
