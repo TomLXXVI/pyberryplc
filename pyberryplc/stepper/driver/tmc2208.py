@@ -2,7 +2,7 @@ import logging
 import time
 from pyberryplc.core.gpio import DigitalOutput
 from pyberryplc.stepper.driver import StepperMotor
-from pyberryplc.stepper.uart import TMC2208UART
+from pyberryplc.stepper.uart.tmc2208_uart import TMC2208UART
 from pyberryplc.stepper.uart.tmc2208_registers import IHOLDIRUNRegister
 
 
