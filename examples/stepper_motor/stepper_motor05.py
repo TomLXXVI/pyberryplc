@@ -17,14 +17,15 @@ class StepperUARTTestPLC(AbstractPLC):
             dir_pin=26,
             full_steps_per_rev=200,
             uart=TMC2208UART(port="/dev/ttyAMA0"),
+            high_sensitivity=True,
             logger=self.logger
         )
 
         self.profile = TrapezoidalProfile(
             min_angular_speed=11.25,
             max_angular_speed=180.0,
-            accel_angle=90,
-            decel_angle=90
+            accel_angle=15,
+            decel_angle=15
         )
 
         self.X0 = self.add_marker("X0")
@@ -37,7 +38,8 @@ class StepperUARTTestPLC(AbstractPLC):
         if self.input_flag:
             self.input_flag = False
             self.stepper.enable()
-            self.stepper.set_microstepping("1/16")
+            self.stepper.set_current_via_uart(run_current_pct=19, hold_current_pct=10)
+            self.stepper.set_microstepping("1/2")
             self.X0.activate()
 
     def _sequence_control(self):
