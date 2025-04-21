@@ -16,3 +16,5 @@ from .motion_profile import (
     draw_velocity_profiles,
     draw_acceleration_profiles
 )
+
+from .delay_generator import StepDelayGenerator

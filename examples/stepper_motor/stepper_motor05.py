@@ -1,8 +1,11 @@
 import os
 from pyberryplc.core import AbstractPLC
-from pyberryplc.stepper import TMC2208StepperMotor, TMC2208UART, TrapezoidalProfile
+from pyberryplc.stepper import TMC2208StepperMotor, TMC2208UART
+from pyberryplc.motion_profiles import Quantity, TrapezoidalProfile, StepDelayGenerator
 from pyberryplc.log_utils import init_logger
 from keyboard_input import KeyInput
+
+Q_ = Quantity
 
 
 class StepperUARTTestPLC(AbstractPLC):
@@ -16,18 +19,23 @@ class StepperUARTTestPLC(AbstractPLC):
             step_pin=27,
             dir_pin=26,
             full_steps_per_rev=200,
+            microstep_resolution="1/8",
             uart=TMC2208UART(port="/dev/ttyAMA0"),
             high_sensitivity=True,
             logger=self.logger
         )
 
         self.profile = TrapezoidalProfile(
-            min_angular_speed=11.25,
-            max_angular_speed=180.0,
-            accel_angle=15,
-            decel_angle=15
+            ds_tot=Q_(720, 'deg'),
+            dt_tot=Q_(5, 's'),
+            dt_acc=Q_(1, 's')
         )
-
+        
+        self.delay_generator = StepDelayGenerator(
+            stepper=self.stepper,
+            profile=self.profile
+        )
+        
         self.X0 = self.add_marker("X0")
         self.X1 = self.add_marker("X1")
         self.X2 = self.add_marker("X2")
@@ -37,9 +45,15 @@ class StepperUARTTestPLC(AbstractPLC):
     def _init_control(self):
         if self.input_flag:
             self.input_flag = False
+            
+            # Stepper driver configuration 
             self.stepper.enable()
-            self.stepper.set_current_via_uart(run_current_pct=19, hold_current_pct=10)
-            self.stepper.set_microstepping("1/2")
+            self.stepper.set_microstepping()
+            self.stepper.set_current_via_uart(
+                run_current_pct=19, 
+                hold_current_pct=10
+            )
+            
             self.X0.activate()
 
     def _sequence_control(self):
@@ -66,9 +80,8 @@ class StepperUARTTestPLC(AbstractPLC):
         if self.X1.active:
             if self.X1.rising_edge:
                 self.stepper.start_rotation(
-                    degrees=720,
                     direction="forward",
-                    profile=self.profile
+                    delays=self.delay_generator.delays
                 )
                 self.logger.info("Press 'r' to start motor in reverse")
             self.stepper.do_single_step()
@@ -76,9 +89,8 @@ class StepperUARTTestPLC(AbstractPLC):
         if self.X2.active:
             if self.X2.rising_edge:
                 self.stepper.start_rotation(
-                    degrees=720,
                     direction="backward",
-                    profile=self.profile
+                    delays=self.delay_generator.delays
                 )
                 self.logger.info("Press 'q' to go back to idle")
             self.stepper.do_single_step()

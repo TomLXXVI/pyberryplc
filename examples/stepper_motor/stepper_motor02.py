@@ -1,4 +1,4 @@
-from pyberryplc.stepper.stepper_gpio import TMC2208StepperMotor
+from pyberryplc.stepper.driver import TMC2208StepperMotor
 import time
 
 # Stel hier je GPIO-pinnen in

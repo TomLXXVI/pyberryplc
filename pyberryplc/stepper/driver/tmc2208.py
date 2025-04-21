@@ -1,9 +1,9 @@
 import logging
 import time
 from pyberryplc.core.gpio import DigitalOutput
-from pyberryplc.stepper.stepper_gpio import StepperMotor
-from pyberryplc.stepper.stepper_uart import TMC2208UART
-from pyberryplc.stepper.stepper_uart.tmc2208_registers import IHOLDIRUNRegister
+from pyberryplc.stepper.driver import StepperMotor
+from pyberryplc.stepper.uart import TMC2208UART
+from pyberryplc.stepper.uart.tmc2208_registers import IHOLDIRUNRegister
 
 
 class TMC2208StepperMotor(StepperMotor):
@@ -19,7 +19,26 @@ class TMC2208StepperMotor(StepperMotor):
     The driver is enabled either through GPIO (enable pin) or via UART using 
     register settings.
     """
-
+    
+    MICROSTEP_CONFIG_GPIO: dict[str, tuple[int, int]] = {
+        "1/2": (1, 0),
+        "1/4": (0, 1),
+        "1/8": (0, 0),
+        "1/16": (1, 1),
+    }
+    
+    MICROSTEP_CONFIG_UART: dict[str, int] = {
+        "1/256": 0,
+        "1/128": 1,
+        "1/64": 2,
+        "1/32": 3,
+        "1/16": 4,
+        "1/8": 5,
+        "1/4": 6,
+        "1/2": 7,
+        "full": 8
+    } 
+    
     def __init__(
         self,
         step_pin: int,
@@ -28,6 +47,7 @@ class TMC2208StepperMotor(StepperMotor):
         ms1_pin: int | None = None,
         ms2_pin: int | None = None,
         full_steps_per_rev: int = 200,
+        microstep_resolution: str = "full",
         uart: TMC2208UART | None = None,
         high_sensitivity: bool = False,
         logger: logging.Logger | None = None,
@@ -49,6 +69,12 @@ class TMC2208StepperMotor(StepperMotor):
             GPIO pin for MS2 microstepping control (GPIO mode).
         full_steps_per_rev : int
             Number of full steps per motor revolution (default 200).
+        microstep_resolution : str, optional
+            The microstep resolution to be used. Default is full-step mode.
+            Valid microstep resolutions are defined in class attribute 
+            MICROSTEP_FACTORS of the base class. However, it is possible that 
+            the actual driver does not support all of these. This should be 
+            checked in advance.
         uart : TMC2208UART | None, optional
             UART interface for register-level control of the driver.
         high_sensitivity : bool, optional
@@ -56,11 +82,23 @@ class TMC2208StepperMotor(StepperMotor):
         logger : logging.Logger | None, optional
             Logger for debug output.
         """
-        super().__init__(step_pin, dir_pin, enable_pin, full_steps_per_rev, logger)
-        self.ms1 = DigitalOutput(ms1_pin, label="MS1") if ms1_pin is not None else None
-        self.ms2 = DigitalOutput(ms2_pin, label="MS2") if ms2_pin is not None else None
         self.uart = uart
         self.high_sensitivity = high_sensitivity
+        self.ms1 = (
+            DigitalOutput(ms1_pin, label="MS1")
+            if ms1_pin is not None
+            else None
+        )
+        self.ms2 = (
+            DigitalOutput(ms2_pin, label="MS2")
+            if ms2_pin is not None
+            else None
+        )
+        super().__init__(
+            step_pin, dir_pin, enable_pin, 
+            full_steps_per_rev, microstep_resolution, 
+            logger
+        )
 
     def enable(self) -> None:
         """
@@ -109,81 +147,70 @@ class TMC2208StepperMotor(StepperMotor):
             self.logger.info("Driver disabled")
         else:
             super().disable()
-
-    def set_microstepping(self, mode: str) -> None:
+    
+    def _validate_microstepping(self, microstep_resolution: str) -> tuple[str, int]:
         """
-        Sets the microstepping mode for the driver.
-
-        If a UART interface is configured, this sets the resolution using the 
-        internal CHOPCONF register. Otherwise, it configures the MS1/MS2 GPIO 
-        pins to achieve the desired stepping resolution.
-
-        Parameters
-        ----------
-        mode : str
-            Desired microstepping mode. Supported values are:
-            - UART: "1/256", "1/128", "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "full"
-            - GPIO: "1/2", "1/4", "1/8", "1/16"
-
+        Checks whether the microstep resolution is valid for the TMC2208 driver. 
+        
+        Returns
+        -------
+        microstep_resolution : str
+            The microstep resolution if valid.
+        microstep_factor: int
+            The microstep factor used for calculating the steps per degree and 
+            the step angle.
+        
         Raises
         ------
-        ValueError
-            If the given mode is not supported.
+        ValueError :
+            If the microstep resolution is unavailable on the TMC2208 driver.
         """
-        if self.uart is not None:
-            self._set_microstepping_uart(mode)
+        valid_resolutions = (
+            list(self.MICROSTEP_CONFIG_UART.keys()) 
+            if self.uart is not None 
+            else 
+            list(self.MICROSTEP_CONFIG_GPIO.keys())
+        )
+        if microstep_resolution in valid_resolutions:
+            microstep_factor = self.MICROSTEP_FACTORS[microstep_resolution]
+            return microstep_resolution, microstep_factor
         else:
-            self._set_microstepping_gpio(mode)
-
-    def _set_microstepping_gpio(self, mode: str) -> None:
-        """
-        Configure microstepping mode.
-
-        Parameters
-        ----------
-        mode : str
-            One of: "1/2", "1/4", "1/8", "1/16"
-        """
-        config: dict[str, tuple[int, int]] = {
-            "1/2": (1, 0),
-            "1/4": (0, 1),
-            "1/8": (0, 0),
-            "1/16": (1, 1),
-        }
-        if mode not in config:
-            raise ValueError(f"Invalid microstepping mode: {mode}")
-
+            raise ValueError(
+                f"Microstep resolution '{microstep_resolution}' is "
+                f"unavailable on this driver. "
+                f"Available: {valid_resolutions}"
+            )
+    
+    def set_microstepping(self) -> None:
+        """Configures microstepping on the TMC2208 driver."""
+        if self.uart is not None:
+            self._set_microstepping_uart()
+        else:
+            self._set_microstepping_gpio()
+    
+    def _set_microstepping_gpio(self) -> None:
+        """Configures microstepping on the TMC2208 driver via GPIO."""
         if self.ms1 and self.ms2:
-            ms1_val, ms2_val = config[mode]
+            ms1_val, ms2_val = self.MICROSTEP_CONFIG_GPIO[self.microstep_resolution]
             self.ms1.write(ms1_val)
             self.ms2.write(ms2_val)
-            self.microstep_mode = mode
             self.logger.info(
-                f"Microstepping set to {mode} (MS1={ms1_val}, MS2={ms2_val})"
+                f"Microstepping set to {self.microstep_resolution} "
+                f"(MS1={ms1_val}, MS2={ms2_val})"
             )
         else:
             self.logger.warning(
                 "MS1/MS2 pins not configured, skipping microstepping setup"
             )
 
-    def _set_microstepping_uart(self, mode: str) -> None:
-        config: dict[str, int] = {
-            "1/256": 0,
-            "1/128": 1,
-            "1/64": 2,
-            "1/32": 3,
-            "1/16": 4,
-            "1/8": 5,
-            "1/4": 6,
-            "1/2": 7,
-            "full": 8
-        }
-        if mode not in config:
-            raise ValueError(f"Invalid microstepping mode: {mode}")
-        mres = config[mode]
+    def _set_microstepping_uart(self) -> None:
+        """Configures microstepping on the TMC2208 driver via UART."""
+        mres = self.MICROSTEP_CONFIG_UART[self.microstep_resolution]
         self.uart.update_register("CHOPCONF", {"mres": mres})
-        self.microstep_mode = mode
-        self.logger.info(f"Setting microstepping via UART: {mode} (mres = {mres})")
+        self.logger.info(
+            f"Setting microstepping via UART: {self.microstep_resolution} "
+            f"(mres = {mres})"
+        )
 
     def set_current_via_uart(
         self,
@@ -192,7 +219,7 @@ class TMC2208StepperMotor(StepperMotor):
         ihold_delay: int = 8
     ) -> None:
         """
-        Set motor current digitally via UART using percentages.
+        Sets motor current digitally via UART using percentages.
 
         Parameters
         ----------

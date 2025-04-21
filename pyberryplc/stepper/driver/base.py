@@ -3,12 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 
-import numpy as np
-
 from pyberryplc.core.gpio import DigitalOutput
-from pyberryplc.motion_profiles import MotionProfile, Quantity
-
-Q_ = Quantity
 
 
 class StepperMotor(ABC):
@@ -19,7 +14,6 @@ class StepperMotor(ABC):
     This class provides the foundation for implementing stepper motor drivers
     that execute rotations asynchronously using periodic do_single_step calls.
     """
-
     MICROSTEP_FACTORS: dict[str, int] = {
         "full": 1,
         "1/2": 2,
@@ -38,6 +32,7 @@ class StepperMotor(ABC):
         dir_pin: int,
         enable_pin: int | None = None,
         full_steps_per_rev: int = 200,
+        microstep_resolution: str = "full",
         logger: logging.Logger | None = None
     ) -> None:
         """
@@ -51,19 +46,32 @@ class StepperMotor(ABC):
             GPIO pin connected to the DIR input of the driver.
         enable_pin : int | None, optional
             GPIO pin connected to the EN input of the driver (active low).
-        full_steps_per_rev : int
+        full_steps_per_rev : int, optional
             Number of full steps per revolution (i.e. at full step mode).
+            Default is 200. However, this is a characteristic of the actual
+            stepper motor.
+        microstep_resolution : str, optional
+            The microstep resolution to be used. Default is full-step mode.
+            Valid microstep resolutions are defined in class attribute 
+            MICROSTEP_FACTORS. However, it is possible that the actual driver
+            does not support all of these. This should be checked in advance. 
         logger : logging.Logger | None, optional
             Logger for debug output.
         """
         self.step = DigitalOutput(step_pin, label="STEP", active_high=True)
         self.dir = DigitalOutput(dir_pin, label="DIR", active_high=True)
-        self._enable = DigitalOutput(enable_pin, label="EN", active_high=False) if enable_pin is not None else None
+        self._enable = (
+            DigitalOutput(enable_pin, label="EN", active_high=False) 
+            if enable_pin is not None 
+            else None
+        )
         self.full_steps_per_rev = full_steps_per_rev
+        res = self._validate_microstepping(microstep_resolution)
+        self.microstep_resolution = res[0]
+        self.microstep_factor = res[1]
         self.logger = logger or logging.getLogger(__name__)
-        self.microstep_mode: str = "full"
-        self._step_width = Q_(10, 'µs')  # time duration of single step pulse
-
+        self.step_width = 10e-6  # time duration (sec) of single step pulse
+        
         # State for non-blocking motion control
         self._busy = False
         self._next_step_time = 0.0
@@ -87,26 +95,57 @@ class StepperMotor(ABC):
         return self._busy
 
     @abstractmethod
-    def set_microstepping(self, mode: str) -> None:
+    def _validate_microstepping(self, microstep_resolution: str) -> tuple[str, int]:
         """
-        Set the microstepping mode.
+        Check whether the microstep resolution is valid for the driver. 
+        
+        Returns
+        -------
+        microstep_resolution : str
+            The microstep resolution if valid.
+        microstep_factor: int
+            The microstep factor used for calculating the steps per degree and 
+            the step angle.
+        
+        Raises
+        ------
+        ValueError :
+            If the microstep resolution is unavailable on the driver.
+        """
+        pass
 
-        Parameters
-        ----------
-        mode : str
-            Microstepping mode (e.g., "full", "1/8", "1/16", etc.)
+    @property
+    def steps_per_degree(self) -> float:
+        """Return the number of steps per degree of rotation."""
+        return self.full_steps_per_rev * self.microstep_factor / 360
+    
+    @property
+    def step_angle(self) -> float:
+        """Return the rotation angle in degrees that corresponds with a single 
+        step pulse.
+        """
+        return 1 / self.steps_per_degree
+    
+    @abstractmethod
+    def set_microstepping(self) -> None:
+        """
+        Configure microstepping on the driver.
         """
         pass
 
     def start_rotation(
         self,
-        degrees: float | None,
+        degrees: float | None = None,
         angular_speed: float = 90.0,
-        profile: MotionProfile | None = None,
+        delays: list[float] | None = None,
         direction: str = "forward",
     ) -> None:
         """
         Start a new rotation asynchronously (non-blocking).
+        
+        Either specify the rotation angle in degrees together with a fixed
+        angular speed in deg/sec or use a motion profile to determine the
+        rotation movement that the motor must execute.
         
         Use this method together with method `do_single_step()`.
 
@@ -116,8 +155,12 @@ class StepperMotor(ABC):
             Target rotation angle in degrees.
         angular_speed : float, optional
             Constant angular speed (deg/s) if no profile is given.
-        profile : MotionProfile | None, optional
-            Speed profile to define step delays.
+        delays : list[float], optional
+            If a motion profile has been defined for the rotation, this list 
+            holds the delays between step pulses that generate the motion 
+            profile.  
+            If provided, it overrides the default fixed-speed behavior and 
+            enables acceleration and deceleration during the motion.
         direction : str, optional
             Either "forward" or "backward". Default is "forward".
         """
@@ -125,7 +168,7 @@ class StepperMotor(ABC):
             self.logger.warning("Motor is busy — rotation ignored.")
             return
         self._set_direction(direction)
-        self._delays = self._get_delays(degrees, angular_speed, profile)
+        self._delays = self._get_queued_delays(degrees, angular_speed, delays)
         self._next_step_time = time.time()
         self._busy = True
 
@@ -143,19 +186,20 @@ class StepperMotor(ABC):
         if now >= self._next_step_time and self._delays:
             self._pulse_step_pin()
             if self._delays:
-                self._next_step_time = now + 2 * self._delays.popleft()
+                self._next_step_time = now + self._delays.popleft()
             if not self._delays:
                 self._busy = False
     
     def rotate(
         self,
-        degrees: float,
+        degrees: float | None = None,
         angular_speed: float = 90.0,
-        profile: MotionProfile | None = None,
+        delays: list[float] | None = None,
         direction: str = "forward",
     ) -> None:
         """
-        Rotate the motor a specified number of degrees.
+        Rotate the motor a specified number of degrees at a given constant
+        angular speed (in deg/sec) or pass a motion profile to rotate the motor.
         
         Note that is a blocking function: the method won't return until the
         rotation is completely finished.
@@ -167,10 +211,12 @@ class StepperMotor(ABC):
         angular_speed : float, optional
             Constant angular speed in degrees per second (used if no profile is 
             given). Default is 90.0.
-        profile : MotionProfile, optional
-            Speed profile that defines the delay between step pulses.  
+        delays : StepDelayGenerator, optional
+            If a motion profile has been defined for the rotation, this list 
+            holds the delays between step pulses that generate the motion 
+            profile.  
             If provided, it overrides the default fixed-speed behavior and 
-            enables acceleration and deceleration during the motion.
+            enables acceleration and deceleration during the motion.  
         direction : str, optional
             Either "forward" or "backward". Default is "forward".
         """
@@ -178,48 +224,35 @@ class StepperMotor(ABC):
             self.logger.warning("Motor is busy — rotation ignored.")
             return
         self._set_direction(direction)
-        self._delays = self._get_delays(degrees, angular_speed, profile)
-        total_steps = len(self._delays)
-
-        self.logger.info(
-            f"Rotating {direction}: {total_steps} steps over {degrees:.1f}° at "
-            f"{'profiled speed' if profile else f'{angular_speed:.1f}°/s'}"
-        )
+        self._delays = self._get_queued_delays(degrees, angular_speed, delays)
    
         for delay in self._delays:
             self.step.write(True)
-            time.sleep(delay)
+            time.sleep(delay / 2)
             self.step.write(False)
-            time.sleep(delay)
+            time.sleep(delay / 2)
     
-    def _get_delays(
+    def _get_queued_delays(
         self, 
-        degrees: float, 
+        degrees: float | None, 
         angular_speed: float | None, 
-        profile: MotionProfile | None
+        delays: list[float] | None
     ) -> deque[float]:
         """Get the delays between successive steps in a deque."""
-        steps_per_degree = self.full_steps_per_rev * self._microstep_factor() / 360
-        if profile:
-            step_angle = 1 / steps_per_degree
-            start_angle = 0.0
-            final_angle = profile.ds_tot.to('deg').m + step_angle
-            angles = Q_(np.arange(start_angle, final_angle, step_angle), 'deg')
-            times = Quantity.from_list(list(map(profile.time_from_position_fn(), angles)))
-            delays = np.diff(times) - self._step_width
-            delays = delays.to('s').m.tolist()
+        if delays:
             return deque(delays)
         else:
+            steps_per_degree = self.steps_per_degree
             total_steps = int(degrees * steps_per_degree)
             step_rate = angular_speed * steps_per_degree  # in steps/sec
-            delay = 1.0 / step_rate / 2  # seconds per 1/2 step
+            delay = 1.0 / step_rate
             delays = [delay] * total_steps
             return deque(delays)
     
     def _pulse_step_pin(self) -> None:
         """Generate a short pulse on the STEP pin (10 microseconds)."""
         self.step.write(True)
-        time.sleep(self._step_width.to('s').m)  # default 10 µs pulse
+        time.sleep(self.step_width)  # default 10 µs pulse
         self.step.write(False)
 
     def _set_direction(self, direction: str) -> None:
@@ -234,7 +267,3 @@ class StepperMotor(ABC):
         if direction not in ("forward", "backward"):
             raise ValueError("Direction must be 'forward' or 'backward'")
         self.dir.write(direction == "forward")
-
-    def _microstep_factor(self) -> int:
-        """Return the integer microstepping factor based on current mode."""
-        return self.MICROSTEP_FACTORS.get(self.microstep_mode, 1)

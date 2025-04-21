@@ -85,7 +85,7 @@ class MotionProfile(ABC):
         dt_tot: Quantity | None = None,
         ds_tot: Quantity | None = None,
         dt_acc: Quantity | None = None,
-        translation: bool = True
+        translation: bool = False
     ) -> None:
         """Creates a `MotionProfile` object.
 
@@ -103,7 +103,7 @@ class MotionProfile(ABC):
             Acceleration time.
         translation:
             Indicates whether the motion is translational (`True`) or rotational
-            (`False`).
+            (`False`). Default is `False`.
 
         A motion profile can be defined in four different ways:
         1.  Either `v_m`, `a_m` (or `dt_acc`), and `ds_tot` are specified (other
