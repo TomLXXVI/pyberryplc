@@ -2,8 +2,13 @@ import time
 import logging
 from abc import ABC, abstractmethod
 from collections import deque
+
+import numpy as np
+
 from pyberryplc.core.gpio import DigitalOutput
-from .speed_profiles import SpeedProfile
+from pyberryplc.motion_profiles import MotionProfile, Quantity
+
+Q_ = Quantity
 
 
 class StepperMotor(ABC):
@@ -57,6 +62,7 @@ class StepperMotor(ABC):
         self.full_steps_per_rev = full_steps_per_rev
         self.logger = logger or logging.getLogger(__name__)
         self.microstep_mode: str = "full"
+        self._step_width = Q_(10, 'µs')  # time duration of single step pulse
 
         # State for non-blocking motion control
         self._busy = False
@@ -94,10 +100,10 @@ class StepperMotor(ABC):
 
     def start_rotation(
         self,
-        degrees: float,
-        direction: str = "forward",
+        degrees: float | None,
         angular_speed: float = 90.0,
-        profile: SpeedProfile | None = None
+        profile: MotionProfile | None = None,
+        direction: str = "forward",
     ) -> None:
         """
         Start a new rotation asynchronously (non-blocking).
@@ -106,14 +112,14 @@ class StepperMotor(ABC):
 
         Parameters
         ----------
-        degrees : float
+        degrees : float, optional
             Target rotation angle in degrees.
-        direction : str, optional
-            Either "forward" or "backward". Default is "forward".
         angular_speed : float, optional
             Constant angular speed (deg/s) if no profile is given.
-        profile : SpeedProfile | None, optional
+        profile : MotionProfile | None, optional
             Speed profile to define step delays.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
         """
         if self.busy:
             self.logger.warning("Motor is busy — rotation ignored.")
@@ -144,9 +150,9 @@ class StepperMotor(ABC):
     def rotate(
         self,
         degrees: float,
-        direction: str = "forward",
         angular_speed: float = 90.0,
-        profile: SpeedProfile | None = None
+        profile: MotionProfile | None = None,
+        direction: str = "forward",
     ) -> None:
         """
         Rotate the motor a specified number of degrees.
@@ -158,15 +164,15 @@ class StepperMotor(ABC):
         ----------
         degrees : float
             The rotation angle in degrees.
-        direction : str, optional
-            Either "forward" or "backward". Default is "forward".
         angular_speed : float, optional
             Constant angular speed in degrees per second (used if no profile is 
             given). Default is 90.0.
-        profile : SpeedProfile, optional
+        profile : MotionProfile, optional
             Speed profile that defines the delay between step pulses.  
             If provided, it overrides the default fixed-speed behavior and 
-            enables acceleration and deceleration during the motion. 
+            enables acceleration and deceleration during the motion.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
         """
         if self.busy:
             self.logger.warning("Motor is busy — rotation ignored.")
@@ -190,13 +196,18 @@ class StepperMotor(ABC):
         self, 
         degrees: float, 
         angular_speed: float | None, 
-        profile: SpeedProfile | None
+        profile: MotionProfile | None
     ) -> deque[float]:
         """Get the delays between successive steps in a deque."""
         steps_per_degree = self.full_steps_per_rev * self._microstep_factor() / 360
         if profile:
-            profile.set_conversion_factor(steps_per_degree)
-            delays = profile.get_delays(degrees)  # seconds per 1/2 step 
+            step_angle = 1 / steps_per_degree
+            start_angle = 0.0
+            final_angle = profile.ds_tot.to('deg').m + step_angle
+            angles = Q_(np.arange(start_angle, final_angle, step_angle), 'deg')
+            times = Quantity.from_list(list(map(profile.time_from_position_fn(), angles)))
+            delays = np.diff(times) - self._step_width
+            delays = delays.to('s').m.tolist()
             return deque(delays)
         else:
             total_steps = int(degrees * steps_per_degree)
@@ -208,7 +219,7 @@ class StepperMotor(ABC):
     def _pulse_step_pin(self) -> None:
         """Generate a short pulse on the STEP pin (10 microseconds)."""
         self.step.write(True)
-        time.sleep(0.00001)  # 10 µs pulse
+        time.sleep(self._step_width.to('s').m)  # default 10 µs pulse
         self.step.write(False)
 
     def _set_direction(self, direction: str) -> None:
