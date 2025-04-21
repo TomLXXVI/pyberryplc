@@ -14,7 +14,12 @@ dependencies = [
     "python-decouple",
     "gpiozero",
     "pigpio",
-    "pyserial"
+    "pyserial",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "sympy",
+    "pint"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
