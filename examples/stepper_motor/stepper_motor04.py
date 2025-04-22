@@ -65,14 +65,14 @@ class StepperUARTTestPLC(AbstractPLC):
             self.logger.info("Press 's' to start motor")
             
         if self.X1.rising_edge:
-            self.stepper.rotate(
+            self.stepper.rotate_profile(
                 direction="forward", 
                 profile=self.profile
             )
             self.logger.info("Press 'r' to start motor in reverse")
             
         if self.X2.rising_edge:
-            self.stepper.rotate(
+            self.stepper.rotate_profile(
                 direction="backward", 
                 profile=self.profile
             )

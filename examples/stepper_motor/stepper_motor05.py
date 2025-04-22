@@ -72,7 +72,7 @@ class StepperUARTTestPLC(AbstractPLC):
         
         if self.X1.active:
             if self.X1.rising_edge:
-                self.stepper.start_rotation(
+                self.stepper.start_rotation_profile(
                     direction="forward",
                     profile=self.profile
                 )
@@ -81,7 +81,7 @@ class StepperUARTTestPLC(AbstractPLC):
         
         if self.X2.active:
             if self.X2.rising_edge:
-                self.stepper.start_rotation(
+                self.stepper.start_rotation_profile(
                     direction="backward",
                     profile=self.profile
                 )
