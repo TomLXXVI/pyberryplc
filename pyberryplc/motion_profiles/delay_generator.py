@@ -1,37 +1,64 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 from .motion_profile import MotionProfile
 
 if TYPE_CHECKING:
     from pyberryplc.stepper import StepperMotor
 
 
-class StepDelayGenerator:
-    """
-    Class that takes a stepper motor and a motion profile. From the motion 
-    profile a list of step pulse delays is determined to drive the stepper motor
-    according to this motion profile.
-    
-    The list of delays is accessible through attribute `delays`.
-    """
-    
+class DynamicDelayGenerator:
+
     def __init__(
         self,
         stepper: StepperMotor,
-        profile: MotionProfile,
+        profile: MotionProfile
     ) -> None:
-        self.stepper = stepper
         self.profile = profile
-        self.delays: list[float] = self._generate_delays()
-        self._index = 0
-    
-    def _generate_delays(self) -> list[float]:
-        start_angle = 0.0
-        final_angle = self.profile.ds_tot + self.stepper.step_angle
-        angles = np.arange(start_angle, final_angle, self.stepper.step_angle)
-        times = list(map(self.profile.time_from_position_fn(), angles))
-        delays = np.diff(times) - self.stepper.step_width
-        return delays.tolist()
+        self.step_angle = stepper.step_angle
+
+        self.t = 0.0
+        self.s = 0.0
+        self.step_index = 0
+
+        self.velocity_up_fn = profile.ramp_up_fn()
+        self.accel_duration = profile.dt_acc
+
+        self.state = "accel"
+        self.cruise_velocity = None
+        self.decel_triggered = False
+        self.decel_start_velocity = None
+        self.velocity_down_fn = None
+
+    def trigger_decel(self):
+        self.state = "decel"
+        self.decel_triggered = True
+        self.decel_start_velocity = self.velocity_up_fn(self.t)
+        self.velocity_down_fn = self.profile.ramp_down_fn(self.t, self.decel_start_velocity)
+
+    def next_delay(self) -> float:
+        if self.state == "done":
+            raise StopIteration
+        
+        v = 0.0
+        if self.state == "accel":
+            v = self.velocity_up_fn(self.t)
+            if self.t >= self.accel_duration:
+                self.state = "cruise"
+                self.cruise_velocity = v
+        elif self.state == "cruise":
+            v = self.cruise_velocity
+            if self.decel_triggered:
+                self.decel_triggered = False
+        elif self.state == "decel":
+            v = self.velocity_down_fn(self.t)
+            if v <= 0.0:
+                self.state = "done"
+                raise StopIteration
+
+        delay = abs(self.step_angle / v)
+        self.t += delay
+        self.s += self.step_angle
+        self.step_index += 1
+
+        return delay

@@ -4,12 +4,12 @@ from .motion_profile import (
     SCurvedProfile
 )
 
-from .delay_generator import StepDelayGenerator
+from .delay_generator import DynamicDelayGenerator
 
 
 __all__ = [
     "MotionProfile",
     "TrapezoidalProfile",
     "SCurvedProfile",
-    "StepDelayGenerator"
+    "DynamicDelayGenerator"
 ]

@@ -3,10 +3,8 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 
-import numpy as np
-
 from pyberryplc.core.gpio import DigitalOutput
-from pyberryplc.motion_profiles import MotionProfile
+from pyberryplc.motion_profiles import MotionProfile, DynamicDelayGenerator
 
 
 class StepperMotor(ABC):
@@ -64,8 +62,8 @@ class StepperMotor(ABC):
         self.step = DigitalOutput(step_pin, label="STEP", active_high=True)
         self.dir = DigitalOutput(dir_pin, label="DIR", active_high=True)
         self._enable = (
-            DigitalOutput(enable_pin, label="EN", active_high=False) 
-            if enable_pin is not None 
+            DigitalOutput(enable_pin, label="EN", active_high=False)
+            if enable_pin is not None
             else None
         )
         self.full_steps_per_rev = full_steps_per_rev
@@ -74,11 +72,13 @@ class StepperMotor(ABC):
         self.microstep_factor = res[1]
         self.logger = logger or logging.getLogger(__name__)
         self.step_width = 10e-6  # time duration (sec) of single step pulse
-        
+
         # State for non-blocking motion control
         self._busy = False
         self._next_step_time = 0.0
         self._delays = deque()
+        
+        self._dynamic_generator = None
 
     def enable(self) -> None:
         """Enable the stepper driver (if EN pin is defined)."""
@@ -101,7 +101,7 @@ class StepperMotor(ABC):
     def _validate_microstepping(self, microstep_resolution: str) -> tuple[str, int]:
         """
         Check whether the microstep resolution is valid for the driver. 
-        
+
         Returns
         -------
         microstep_resolution : str
@@ -109,7 +109,7 @@ class StepperMotor(ABC):
         microstep_factor: int
             The microstep factor used for calculating the steps per degree and 
             the step angle.
-        
+
         Raises
         ------
         ValueError :
@@ -121,14 +121,14 @@ class StepperMotor(ABC):
     def steps_per_degree(self) -> float:
         """Return the number of steps per degree of rotation."""
         return self.full_steps_per_rev * self.microstep_factor / 360
-    
+
     @property
     def step_angle(self) -> float:
         """Return the rotation angle in degrees that corresponds with a single 
         step pulse.
         """
         return 1 / self.steps_per_degree
-    
+
     @abstractmethod
     def set_microstepping(self) -> None:
         """
@@ -136,143 +136,212 @@ class StepperMotor(ABC):
         """
         pass
 
-    def start_rotation(
-        self,
-        angle: float | None = None,
-        angular_speed: float = 90.0,
-        profile: MotionProfile | None = None,
-        direction: str = "forward",
+    def rotate_fixed(
+        self, 
+        angle: float, 
+        angular_speed: float, 
+        direction: str = "forward"
     ) -> None:
-        """
-        Start a new rotation asynchronously (non-blocking).
-        
-        Either specify the rotation angle in degrees together with a fixed
-        angular speed in deg/sec or use a motion profile to determine the
-        rotational movement the motor must execute.
-        
-        Use this method together with method `do_single_step()`.
-
-        Parameters
-        ----------
-        angle : float, optional
-            Target rotation angle in degrees.
-        angular_speed : float, optional
-            Constant angular speed (deg/s) if no profile is given.
-        profile : MotionProfile, optional
-            Motion profile for the rotational movement.
-            If provided, it overrides the default fixed-speed behavior and 
-            enables acceleration and deceleration during the motion.
-        direction : str, optional
-            Either "forward" or "backward". Default is "forward".
-        """
-        if self.busy:
-            self.logger.warning("Motor is busy — rotation ignored.")
-            return
-        self._set_direction(direction)
-        self._delays = self._process_motion_profile(profile, angle, angular_speed)
-        self._next_step_time = time.time()
-        self._busy = True
-
-    def do_single_step(self) -> None:
-        """
-        Perform a single step if the time is right.
-        
-        Before calling this method, call method `start_rotation()` first to
-        define the complete rotation movement.
-        
-        Should be called regularly within the PLC scan cycle.
-        """
-        if not self._busy: return
-        now = time.time()
-        if now >= self._next_step_time and self._delays:
-            self._pulse_step_pin()
-            if self._delays:
-                self._next_step_time = now + self._delays.popleft()
-            if not self._delays:
-                self._busy = False
-    
-    def rotate(
-        self,
-        angle: float | None = None,
-        angular_speed: float = 90.0,
-        profile: MotionProfile | None = None,
-        direction: str = "forward",
-    ) -> None:
-        """
-        Either rotate the motor a specified number of degrees at a given constant
-        angular speed (in deg/sec), or pass a motion profile to rotate the motor.
-        
-        Note that is a blocking function: the method won't return until the
-        rotation is completely finished.
+        """Rotate the motor by a fixed angle at a constant angular speed.
 
         Parameters
         ----------
         angle : float
-            The rotation angle in degrees.
-        angular_speed : float, optional
-            Constant angular speed in degrees per second (used if no profile is 
-            given). Default is 90.0.
-        profile : StepDelayGenerator, optional
-            Motion profile of the rotational movement.
-            If provided, it overrides the default fixed-speed behavior and 
-            enables acceleration and deceleration during the motion.  
+            Target rotation angle in degrees.
+        angular_speed : float
+            Constant speed in degrees per second.
         direction : str, optional
             Either "forward" or "backward". Default is "forward".
         """
-        if self.busy:
-            self.logger.warning("Motor is busy — rotation ignored.")
-            return
         self._set_direction(direction)
-        self._delays = self._process_motion_profile(profile, angle, angular_speed)
-   
-        for delay in self._delays:
-            self.step.write(True)
-            time.sleep(delay / 2)
-            self.step.write(False)
-            time.sleep(delay / 2)
-    
-    def _process_motion_profile(
+        total_steps = int(angle * self.steps_per_degree)
+        delay = 1.0 / (angular_speed * self.steps_per_degree)
+
+        for _ in range(total_steps):
+            self._pulse_step_pin()
+            time.sleep(delay)
+
+    def rotate_profile(
         self, 
-        profile: MotionProfile | None,
-        angle: float | None,
-        angular_speed: float | None
-    ) -> deque[float]:
-        """Processes the motion profile. Calculates the delays between 
-        successive step pulses and returns them in a deque.
-        
-        Either `profile` must be given a `MotionProfile` object, or `angle` and 
-        `angular_speed` must be specified. If `profile` is `None`, the motor 
-        will be rotated `angle` degrees at fixed `angular_speed` (deg/s).
+        profile: MotionProfile, 
+        direction: str = "forward"
+    ) -> None:
+        """Rotate the motor according to a static motion profile.
+
+        Parameters
+        ----------
+        profile : MotionProfile
+            Motion profile object that defines acceleration, cruising, and 
+            deceleration phases.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
         """
-        if profile:
-            start_angle = 0.0
-            final_angle = profile.ds_tot + self.step_angle
-            angles = np.arange(start_angle, final_angle, self.step_angle)
-            times = list(map(profile.time_from_position_fn(), angles))
-            delays = np.diff(times) - self.step_width
-            return deque(delays)
-        else:
-            steps_per_degree = self.steps_per_degree
-            total_steps = int(angle * steps_per_degree)
-            step_rate = angular_speed * steps_per_degree  # in steps/sec
-            delay = 1.0 / step_rate
-            delays = [delay] * total_steps
-            return deque(delays)
-    
+        self._set_direction(direction)
+        start_angle = 0.0
+        final_angle = profile.ds_tot + self.step_angle
+        angles = [
+            start_angle + i * self.step_angle 
+            for i in range(int(final_angle / self.step_angle))
+        ]
+        times = list(map(profile.time_from_position_fn(), angles))
+        delays = [t2 - t1 for t1, t2 in zip(times, times[1:])]
+
+        for delay in delays:
+            self._pulse_step_pin()
+            time.sleep(delay)
+
+    def rotate_dynamic(
+        self, 
+        generator: DynamicDelayGenerator, 
+        direction: str = "forward"
+    ) -> None:
+        """Rotate the motor using a dynamic motion profile.
+
+        The motion is controlled in real-time by a delay generator that responds
+        to external triggers for deceleration.
+
+        Parameters
+        ----------
+        generator : DynamicDelayGenerator
+            Dynamic delay generator for real-time profile evaluation.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
+        """
+        self._set_direction(direction)
+        try:
+            while True:
+                self._pulse_step_pin()
+                time.sleep(generator.next_delay())
+        except StopIteration:
+            return
+
+    def start_rotation_fixed(
+        self, 
+        angle: float, 
+        angular_speed: float, 
+        direction: str = "forward"
+    ) -> None:
+        """Start a non-blocking fixed-angle rotation at constant speed.
+
+        This must be used together with `do_single_step()` in the scan cycle.
+
+        Parameters
+        ----------
+        angle : float
+            Rotation angle in degrees.
+        angular_speed : float
+            Constant angular speed in degrees per second.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
+        """
+        self._set_direction(direction)
+        total_steps = int(angle * self.steps_per_degree)
+        delay = 1.0 / (angular_speed * self.steps_per_degree)
+        self._delays = deque([delay] * total_steps)
+        self._busy = True
+        self._next_step_time = time.time()
+
+    def start_rotation_profile(
+        self, 
+        profile: MotionProfile, 
+        direction: str = "forward"
+    ) -> None:
+        """Start a non-blocking rotation using a static motion profile.
+
+        This must be used together with `do_single_step()` in the scan cycle.
+
+        Parameters
+        ----------
+        profile : MotionProfile
+            Static motion profile object.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
+        """
+        self._set_direction(direction)
+        start_angle = 0.0
+        final_angle = profile.ds_tot + self.step_angle
+        angles = [
+            start_angle + i * self.step_angle 
+            for i in range(int(final_angle / self.step_angle))
+        ]
+        times = list(map(profile.time_from_position_fn(), angles))
+        delays = [t2 - t1 for t1, t2 in zip(times, times[1:])]
+        self._delays = deque(delays)
+        self._busy = True
+        self._next_step_time = time.time()
+
+    def start_rotation_dynamic(
+        self, 
+        generator: DynamicDelayGenerator, 
+        direction: str = "forward"
+    ) -> None:
+        """Start a non-blocking rotation using a dynamic motion profile.
+
+        This must be used together with `do_single_step()` in the scan cycle.
+
+        Parameters
+        ----------
+        generator : DynamicDelayGenerator
+            Real-time delay generator object.
+        direction : str, optional
+            Either "forward" or "backward". Default is "forward".
+        """
+        self._set_direction(direction)
+        self._dynamic_generator = generator
+        self._delays = None
+        self._busy = True
+        self._next_step_time = time.time()
+
+    def do_single_step_dynamic(self) -> None:
+        """Perform one step of a dynamic non-blocking motion if timing is right.
+
+        This should be called cyclically during the scan.
+        """
+        if not self._busy or not hasattr(self, '_dynamic_generator'):
+            return
+
+        now = time.time()
+        if now >= self._next_step_time:
+            try:
+                self._pulse_step_pin()
+                delay = self._dynamic_generator.next_delay()
+                self._next_step_time = now + delay
+            except StopIteration:
+                self._busy = False
+                self._dynamic_generator = None
+
+    def do_single_step(self) -> None:
+        """Perform one step of a non-blocking motion if timing is right.
+
+        Internally dispatches to dynamic or static handler.
+        """
+        if not self._busy:
+            return
+
+        if hasattr(self, '_dynamic_generator') and self._dynamic_generator:
+            self.do_single_step_dynamic()
+            return
+
+        now = time.time()
+        if now >= self._next_step_time and self._delays:
+            self._pulse_step_pin()
+            self._next_step_time = now + self._delays.popleft()
+            if not self._delays:
+                self._busy = False
+
     def _pulse_step_pin(self) -> None:
-        """Generate a short pulse on the STEP pin (10 microseconds)."""
+        """Generate a single pulse on the STEP pin."""
         self.step.write(True)
-        time.sleep(self.step_width)  # default 10 µs pulse
+        time.sleep(self.step_width)
         self.step.write(False)
 
     def _set_direction(self, direction: str) -> None:
-        """
-        Set motor direction.
+        """Set the motor direction pin.
 
         Parameters
         ----------
         direction : str
-            Either "forward" or "backward"
+            Either "forward" or "backward".
         """
         if direction not in ("forward", "backward"):
             raise ValueError("Direction must be 'forward' or 'backward'")

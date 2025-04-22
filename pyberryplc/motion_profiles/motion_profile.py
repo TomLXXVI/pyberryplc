@@ -253,7 +253,7 @@ class MotionProfile(ABC):
     def _calc_cst_veloc_distance(self) -> float:
         ds_cov = self.v_m * self.dt_cov
         return ds_cov
-
+        
     def velocity_profile(self) -> tuple[np.ndarray, np.ndarray]:
         """Calculates the velocity profile.
 
@@ -380,7 +380,7 @@ class MotionProfile(ABC):
         N: float | None = None
     ) -> Callable[[float], float]:
         """Returns a function that takes a time moment `t` and returns the 
-        velocity `v` at that time moment.
+        velocity `v` at that time moment (`0 <= t <= dt_tot`).
 
         Parameters
         ----------
@@ -408,7 +408,7 @@ class MotionProfile(ABC):
         N: float | None = None
     ) -> Callable[[float], float]:
         """Returns a function that takes a time moment `t` and returns the 
-        position `s` at that time moment.
+        position `s` at that time moment in the movement (`0 <= t <= dt_tot`).
 
         Parameters
         ----------
@@ -437,7 +437,7 @@ class MotionProfile(ABC):
         N: float | None = None
     ) -> Callable[[float], float]:
         """Returns a function that takes a position `s` and returns the time 
-        moment `t` that position is reached.
+        moment `t` this position is reached in the movement (`0 <= s <= ds_tot`).
 
         Parameters
         ----------
@@ -459,6 +459,57 @@ class MotionProfile(ABC):
                 return t_ax[-1]
             return t
         
+        return fun
+
+    def ramp_up_fn(self) -> Callable[[float], float]:
+        """Returns a function that takes a time moment `t` in seconds and 
+        returns the velocity `v` at that moment during the acceleration phase
+        of the movement (`0 <= t <= dt_acc`).
+        """
+        t0, v0 = 0.0, 0.0
+        t1 = t0 + self.dt_acc
+        t_arr, v_arr = velocity(t1, self._accel_fun, t0, v0)
+        
+        interp = scipy.interpolate.interp1d(t_arr, v_arr)
+        
+        def fun(t: float) -> float:
+            if t0 <= t <= t1:
+                v = interp(t)
+            elif t < t0:
+                v = 0.0
+            else:
+                v = v_arr[-1]
+            return v
+        
+        return fun
+
+    def ramp_down_fn(self, t0: float, v0: float) -> Callable[[float], float]:
+        """Returns a function that takes a time moment `t` in seconds and 
+        returns the velocity `v` at that moment during the deceleration phase
+        of the movement.
+        
+        Parameters
+        ----------
+        t0 : float
+            Time moment the deceleration phase begins.
+        v0: float
+            Initial velocity at the start of the deceleration phase.
+        """
+        t1 = t0 + self.dt_dec
+        t_arr, v_arr = velocity(t1, self._decel_fun, t0, v0)
+
+        interp = scipy.interpolate.interp1d(t_arr, v_arr)
+
+        def fun(t: float) -> float:
+            if t0 <= t <= t1:
+                v = interp(t)
+                if v < 0.0: v = 0.0
+            elif t > t1:
+                v = 0.0
+            else:
+                v = v0
+            return v
+
         return fun
 
 
