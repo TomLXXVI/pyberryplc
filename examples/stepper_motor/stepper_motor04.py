@@ -1,11 +1,9 @@
 import os
 from pyberryplc.core import AbstractPLC
 from pyberryplc.stepper import TMC2208StepperMotor, TMC2208UART
-from pyberryplc.motion_profiles import Quantity, TrapezoidalProfile, StepDelayGenerator
+from pyberryplc.motion_profiles import TrapezoidalProfile
 from pyberryplc.log_utils import init_logger
 from keyboard_input import KeyInput
-
-Q_ = Quantity
 
 
 class StepperUARTTestPLC(AbstractPLC):
@@ -25,16 +23,11 @@ class StepperUARTTestPLC(AbstractPLC):
         )
 
         self.profile = TrapezoidalProfile(
-            ds_tot=Q_(720, 'deg'),
-            dt_tot=Q_(2, 's'),
-            dt_acc=Q_(0.25, 's')
+            ds_tot=720,
+            dt_tot=2,
+            dt_acc=0.25
         )
-        
-        self.delay_generator = StepDelayGenerator(
-            stepper=self.stepper,
-            profile=self.profile
-        )
-        
+                
         self.X0 = self.add_marker("X0")
         self.X1 = self.add_marker("X1")
         self.X2 = self.add_marker("X2")
@@ -74,14 +67,14 @@ class StepperUARTTestPLC(AbstractPLC):
         if self.X1.rising_edge:
             self.stepper.rotate(
                 direction="forward", 
-                delays=self.delay_generator
+                profile=self.profile
             )
             self.logger.info("Press 'r' to start motor in reverse")
             
         if self.X2.rising_edge:
             self.stepper.rotate(
                 direction="backward", 
-                delays=self.delay_generator
+                profile=self.profile
             )
             self.logger.info("Press 'q' to go back to idle")
             

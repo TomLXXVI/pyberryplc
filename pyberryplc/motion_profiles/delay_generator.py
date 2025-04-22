@@ -3,13 +3,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .motion_profile import MotionProfile, Quantity
+from .motion_profile import MotionProfile
 
 if TYPE_CHECKING:
     from pyberryplc.stepper import StepperMotor
-
-
-Q_ = Quantity
 
 
 class StepDelayGenerator:
@@ -25,15 +22,12 @@ class StepDelayGenerator:
         self._index = 0
     
     def _generate_delays(self) -> list[float]:
-        step_angle = self.stepper.step_angle
-        step_width = Q_(self.stepper.step_width, 's')
-        
         start_angle = 0.0
-        final_angle = self.profile.ds_tot.to('deg').m + step_angle
-        
-        angles = Q_(np.arange(start_angle, final_angle, step_angle), 'deg')
-        times = Quantity.from_list(list(map(self.profile.time_from_position_fn(), angles)))
-        delays = np.diff(times) - step_width
-        delays = delays.to('s').m.tolist()
-        return delays
-    
+        final_angle = self.profile.ds_tot + self.stepper.step_angle
+
+        angles = np.arange(start_angle, final_angle, self.stepper.step_angle)
+
+        times = list(map(self.profile.time_from_position_fn(), angles))
+
+        delays = np.diff(times) - self.stepper.step_width
+        return delays.tolist()

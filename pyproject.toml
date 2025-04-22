@@ -17,9 +17,6 @@ dependencies = [
     "pyserial",
     "numpy",
     "scipy",
-    "matplotlib",
-    "sympy",
-    "pint"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

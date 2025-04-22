@@ -82,8 +82,6 @@ class TMC2208StepperMotor(StepperMotor):
         logger : logging.Logger | None, optional
             Logger for debug output.
         """
-        self.uart = uart
-        self.high_sensitivity = high_sensitivity
         self.ms1 = (
             DigitalOutput(ms1_pin, label="MS1")
             if ms1_pin is not None
@@ -94,6 +92,8 @@ class TMC2208StepperMotor(StepperMotor):
             if ms2_pin is not None
             else None
         )
+        self.uart = uart
+        self.high_sensitivity = high_sensitivity
         super().__init__(
             step_pin, dir_pin, enable_pin, 
             full_steps_per_rev, microstep_resolution, 
