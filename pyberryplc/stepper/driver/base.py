@@ -138,7 +138,7 @@ class StepperMotor(ABC):
 
     def start_rotation(
         self,
-        degrees: float | None = None,
+        angle: float | None = None,
         angular_speed: float = 90.0,
         profile: MotionProfile | None = None,
         direction: str = "forward",
@@ -154,12 +154,12 @@ class StepperMotor(ABC):
 
         Parameters
         ----------
-        degrees : float, optional
+        angle : float, optional
             Target rotation angle in degrees.
         angular_speed : float, optional
             Constant angular speed (deg/s) if no profile is given.
         profile : MotionProfile, optional
-            Motion profile of the rotational movement.
+            Motion profile for the rotational movement.
             If provided, it overrides the default fixed-speed behavior and 
             enables acceleration and deceleration during the motion.
         direction : str, optional
@@ -169,7 +169,7 @@ class StepperMotor(ABC):
             self.logger.warning("Motor is busy — rotation ignored.")
             return
         self._set_direction(direction)
-        self._delays = self._get_queued_delays(degrees, angular_speed, profile)
+        self._delays = self._process_motion_profile(profile, angle, angular_speed)
         self._next_step_time = time.time()
         self._busy = True
 
@@ -193,7 +193,7 @@ class StepperMotor(ABC):
     
     def rotate(
         self,
-        degrees: float | None = None,
+        angle: float | None = None,
         angular_speed: float = 90.0,
         profile: MotionProfile | None = None,
         direction: str = "forward",
@@ -207,7 +207,7 @@ class StepperMotor(ABC):
 
         Parameters
         ----------
-        degrees : float
+        angle : float
             The rotation angle in degrees.
         angular_speed : float, optional
             Constant angular speed in degrees per second (used if no profile is 
@@ -223,7 +223,7 @@ class StepperMotor(ABC):
             self.logger.warning("Motor is busy — rotation ignored.")
             return
         self._set_direction(direction)
-        self._delays = self._get_queued_delays(degrees, angular_speed, profile)
+        self._delays = self._process_motion_profile(profile, angle, angular_speed)
    
         for delay in self._delays:
             self.step.write(True)
@@ -231,13 +231,19 @@ class StepperMotor(ABC):
             self.step.write(False)
             time.sleep(delay / 2)
     
-    def _get_queued_delays(
+    def _process_motion_profile(
         self, 
-        degrees: float | None, 
-        angular_speed: float | None, 
-        profile: MotionProfile | None
+        profile: MotionProfile | None,
+        angle: float | None,
+        angular_speed: float | None
     ) -> deque[float]:
-        """Get the delays between successive steps in a deque."""
+        """Processes the motion profile. Calculates the delays between 
+        successive steps and returns them in a deque.
+        
+        Either `profile` must be given a `MotionProfile` object, or `angle` and 
+        `angular_speed` must be specified. If `profile` is `None`, the motor 
+        will be rotated `angle` degrees at fixed `angular_speed` (deg/s).
+        """
         if profile:
             start_angle = 0.0
             final_angle = profile.ds_tot + self.step_angle
@@ -247,7 +253,7 @@ class StepperMotor(ABC):
             return deque(delays)
         else:
             steps_per_degree = self.steps_per_degree
-            total_steps = int(degrees * steps_per_degree)
+            total_steps = int(angle * steps_per_degree)
             step_rate = angular_speed * steps_per_degree  # in steps/sec
             delay = 1.0 / step_rate
             delays = [delay] * total_steps
