@@ -238,7 +238,7 @@ class StepperMotor(ABC):
         angular_speed: float | None
     ) -> deque[float]:
         """Processes the motion profile. Calculates the delays between 
-        successive steps and returns them in a deque.
+        successive step pulses and returns them in a deque.
         
         Either `profile` must be given a `MotionProfile` object, or `angle` and 
         `angular_speed` must be specified. If `profile` is `None`, the motor 
