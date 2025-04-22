@@ -1,3 +1,43 @@
+"""
+Stepper Motor Base Class
+=========================
+
+This module defines an abstract base class `StepperMotor` for stepper motor 
+control via GPIO pins, with support for both blocking and non-blocking motion 
+execution. It provides a consistent interface for various motion modes, 
+including:
+
+1. **Fixed Speed Rotation**
+   - Rotate a given angle at constant angular speed.
+   - Available in both blocking (`rotate_fixed`) and non-blocking 
+     (`start_rotation_fixed`) modes.
+
+2. **Static Motion Profile Rotation**
+   - Rotate using a predefined motion profile (e.g., trapezoidal, S-curve).
+   - Delays between steps are precomputed.
+   - Available in both blocking (`rotate_profile`) and non-blocking 
+     (`start_rotation_profile`) modes.
+
+3. **Dynamic Motion Profile Rotation**
+   - Real-time step control using a `DynamicDelayGenerator`.
+   - Supports live transitions (acceleration → cruising → deceleration) based on
+     external triggers.
+   - Available in blocking (`rotate_dynamic`) and non-blocking 
+     (`start_rotation_dynamic`) modes.
+
+The base class also handles:
+- Microstepping configuration
+- Step pulse generation (including pulse width)
+- GPIO-based direction and enable control
+- Step timing using monotonic timestamps
+
+Non-blocking motion execution must be driven by periodic calls to 
+`do_single_step()` from a PLC scan cycle or real-time loop.
+
+This class is intended to be subclassed by concrete driver implementations
+(e.g., A4988, TMC2208) that provide hardware-specific microstepping logic.
+"""
+
 import time
 import logging
 from abc import ABC, abstractmethod
@@ -12,8 +52,8 @@ class StepperMotor(ABC):
     Abstract base class for a stepper motor controlled via GPIO, with 
     non-blocking or blocking motion control.
 
-    This class provides the foundation for implementing stepper motor drivers
-    that execute rotations asynchronously using periodic do_single_step calls.
+    This class provides the common foundation for implementing stepper motor 
+    drivers.
     """
     MICROSTEP_FACTORS: dict[str, int] = {
         "full": 1,
@@ -155,7 +195,7 @@ class StepperMotor(ABC):
         """
         self._set_direction(direction)
         total_steps = int(angle * self.steps_per_degree)
-        delay = 1.0 / (angular_speed * self.steps_per_degree)
+        delay = 1.0 / (angular_speed * self.steps_per_degree) - self.step_width
 
         for _ in range(total_steps):
             self._pulse_step_pin()
@@ -184,7 +224,7 @@ class StepperMotor(ABC):
             for i in range(int(final_angle / self.step_angle))
         ]
         times = list(map(profile.time_from_position_fn(), angles))
-        delays = [t2 - t1 for t1, t2 in zip(times, times[1:])]
+        delays = [t2 - t1 - self.step_width for t1, t2 in zip(times, times[1:])]
 
         for delay in delays:
             self._pulse_step_pin()
@@ -211,7 +251,7 @@ class StepperMotor(ABC):
         try:
             while True:
                 self._pulse_step_pin()
-                time.sleep(generator.next_delay())
+                time.sleep(generator.next_delay() - self.step_width)
         except StopIteration:
             return
 
@@ -236,7 +276,7 @@ class StepperMotor(ABC):
         """
         self._set_direction(direction)
         total_steps = int(angle * self.steps_per_degree)
-        delay = 1.0 / (angular_speed * self.steps_per_degree)
+        delay = 1.0 / (angular_speed * self.steps_per_degree) - self.step_width
         self._delays = deque([delay] * total_steps)
         self._busy = True
         self._next_step_time = time.time()
@@ -265,7 +305,7 @@ class StepperMotor(ABC):
             for i in range(int(final_angle / self.step_angle))
         ]
         times = list(map(profile.time_from_position_fn(), angles))
-        delays = [t2 - t1 for t1, t2 in zip(times, times[1:])]
+        delays = [t2 - t1 - self.step_width for t1, t2 in zip(times, times[1:])]
         self._delays = deque(delays)
         self._busy = True
         self._next_step_time = time.time()
@@ -304,7 +344,7 @@ class StepperMotor(ABC):
         if now >= self._next_step_time:
             try:
                 self._pulse_step_pin()
-                delay = self._dynamic_generator.next_delay()
+                delay = self._dynamic_generator.next_delay() - self.step_width
                 self._next_step_time = now + delay
             except StopIteration:
                 self._busy = False

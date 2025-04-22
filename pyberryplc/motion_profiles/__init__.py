@@ -4,7 +4,7 @@ from .motion_profile import (
     SCurvedProfile
 )
 
-from .delay_generator import DynamicDelayGenerator
+from .dynamic_generator import DynamicDelayGenerator
 
 
 __all__ = [
