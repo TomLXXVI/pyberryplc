@@ -375,7 +375,7 @@ class MotionProfile(ABC):
             
         return t_arr, a_arr
 
-    def velocity_from_time_fn(
+    def get_fn_velocity_from_time(
         self,
         N: float | None = None
     ) -> Callable[[float], float]:
@@ -394,16 +394,16 @@ class MotionProfile(ABC):
             
         interp = scipy.interpolate.interp1d(t_ax, v_ax)
 
-        def fun(t: float) -> float:
+        def f(t: float) -> float:
             try:
                 v = interp(t)
             except ValueError:
                 return 0.0
             return v
 
-        return fun
+        return f
 
-    def position_from_time_fn(
+    def get_fn_position_from_time(
         self,
         N: float | None = None
     ) -> Callable[[float], float]:
@@ -422,7 +422,7 @@ class MotionProfile(ABC):
                 
         interp = scipy.interpolate.interp1d(t_ax, s_ax)
 
-        def fun(t: float) -> float:
+        def f(t: float) -> float:
             try:
                 s = interp(t)
             except ValueError:
@@ -430,9 +430,9 @@ class MotionProfile(ABC):
                 return s_ax[-1]
             return s
 
-        return fun
+        return f
     
-    def time_from_position_fn(
+    def get_fn_time_from_position(
         self,
         N: float | None = None
     ) -> Callable[[float], float]:
@@ -451,7 +451,7 @@ class MotionProfile(ABC):
                 
         interp = scipy.interpolate.interp1d(s_ax, t_ax)
 
-        def fun(s: float) -> float:
+        def f(s: float) -> float:
             try:
                 t = interp(s)
             except ValueError:
@@ -459,34 +459,41 @@ class MotionProfile(ABC):
                 return t_ax[-1]
             return t
         
-        return fun
-
-    def ramp_up_fn(self) -> Callable[[float], float]:
+        return f
+    
+    def get_accel_fn_velocity_from_time(self) -> Callable[[float], float]:
         """Returns a function that takes a time moment `t` in seconds and 
         returns the velocity `v` at that moment during the acceleration phase
         of the movement (`0 <= t <= dt_acc`).
+        If `t > dt_acc`, the velocity at `dt_acc` is returned, i.e. also the
+        velocity during the constant-velocity phase.
         """
         t0, v0 = 0.0, 0.0
         t1 = t0 + self.dt_acc
         t_arr, v_arr = velocity(t1, self._accel_fun, t0, v0)
+        v_max = v_arr[-1]
         
         interp = scipy.interpolate.interp1d(t_arr, v_arr)
-        
-        def fun(t: float) -> float:
+
+        def f(t: float) -> float:
             if t0 <= t <= t1:
                 v = interp(t)
             elif t < t0:
                 v = 0.0
             else:
-                v = v_arr[-1]
+                v = v_max
             return v
-        
-        return fun
 
-    def ramp_down_fn(self, t0: float, v0: float) -> Callable[[float], float]:
+        return f
+
+    def get_decel_fn_velocity_from_time(
+        self, 
+        t0: float, 
+        v0: float
+    ) -> Callable[[float], float]:
         """Returns a function that takes a time moment `t` in seconds and 
         returns the velocity `v` at that moment during the deceleration phase
-        of the movement.
+        of the movement (`t0 <= t <= t0 + dt_dec`).
         
         Parameters
         ----------
@@ -500,7 +507,7 @@ class MotionProfile(ABC):
 
         interp = scipy.interpolate.interp1d(t_arr, v_arr)
 
-        def fun(t: float) -> float:
+        def f(t: float) -> float:
             if t0 <= t <= t1:
                 v = interp(t)
                 if v < 0.0: v = 0.0
@@ -510,7 +517,152 @@ class MotionProfile(ABC):
                 v = v0
             return v
 
-        return fun
+        return f
+    
+    def get_accel_fn_time_from_position(self) -> Callable[[float], float]:
+        """Returns a function that takes a position `s` and returns the time 
+        moment `t` in seconds when this position is reached.
+        """
+        t0, v0, s0 = 0.0, 0.0, 0.0
+        t1 = t0 + self.dt_acc
+        t_arr, s_arr, v_arr = position(t1, self._accel_fun, t0, v0, s0)
+        t_min = t_arr[0]
+        t_max = t_arr[-1]
+        s_max = s_arr[-1]
+
+        interp_s = scipy.interpolate.interp1d(s_arr, t_arr)
+
+        def f(s: float) -> float:
+            if s0 <= s <= s_max:
+                t = interp_s(s)
+            elif s > s_max:
+                t = t_max
+            else:
+                t = t_min
+            return t
+
+        return f
+    
+    def get_accel_fn_time_from_velocity(self) -> Callable[[float], float]:
+        """Returns a function that takes a velocity `v` and returns the 
+        time moment `t` in seconds when this velocity is reached.
+        """
+        t0, v0, s0 = 0.0, 0.0, 0.0
+        t1 = t0 + self.dt_acc
+        t_arr, s_arr, v_arr = position(t1, self._accel_fun, t0, v0, s0)
+        t_min = t_arr[0]
+        t_max = t_arr[-1]
+        v_max = v_arr[-1]
+
+        interp_v = scipy.interpolate.interp1d(v_arr, t_arr)
+
+        def f(v: float) -> float:
+            if v0 <= v <= v_max:
+                t = interp_v(v)
+            elif v > v_max:
+                t = t_max
+            else:
+                t = t_min
+            return t
+
+        return f
+    
+    def get_decel_fn_time_from_position(
+        self, 
+        t0: float, 
+        s0: float, 
+        v0: float
+    ) -> Callable[[float], float]:
+        """Returns a function that takes a position `s` and returns the time 
+        moment `t` in seconds when this position is reached.
+
+        Parameters
+        ----------
+        t0 : float
+            Time moment the deceleration phase begins.
+        s0 : float
+            Initial position at the start of the deceleration phase.
+        v0: float
+            Initial velocity at the start of the deceleration phase.
+        """
+        t1 = t0 + self.dt_dec
+        t_arr, v_arr = velocity(t1, self._decel_fun, t0, v0)
+
+        # Between t0 and t1 it is possible for the velocity to become negative
+        # depending on the initial conditions. 
+        if v_arr[-1] < 0.0:
+            # Find time `t1` where `v = 0`
+            t_pos = t_arr[v_arr > 0][-1]
+            t_neg = t_arr[v_arr < 0][0]
+            interp_t = scipy.interpolate.interp1d(t_arr, v_arr)
+            sol = scipy.optimize.root_scalar(interp_t, bracket=[t_pos, t_neg])
+            t1 = sol.root
+
+        t_arr, s_arr, v_arr = position(t1, self._decel_fun, t0, v0, s0)
+        t_min = t_arr[0]
+        t_max = t_arr[-1]
+        s_max = s_arr[-1]
+
+        interp_s = scipy.interpolate.interp1d(s_arr, t_arr)
+
+        def f(s: float) -> float:
+            if s0 <= s <= s_max:
+                t = interp_s(s)
+            elif s > s_max:
+                t = t_max
+            else:
+                t = t_min
+            return t
+
+        return f
+
+    def get_decel_fn_time_from_velocity(
+        self, 
+        t0: float, 
+        s0: float, 
+        v0: float
+    ) -> Callable[[float], float]:
+        """Returns a function that takes a velocity `v` and returns the 
+        time moment `t` in seconds when this velocity is reached.
+
+        Parameters
+        ----------
+        t0 : float
+            Time moment the deceleration phase begins.
+        s0 : float
+            Initial position at the start of the deceleration phase.
+        v0: float
+            Initial velocity at the start of the deceleration phase.
+        """
+        t1 = t0 + self.dt_dec
+        t_arr, v_arr = velocity(t1, self._decel_fun, t0, v0)
+
+        # Between t0 and t1 it is possible for the velocity to become negative
+        # depending on the initial conditions. 
+        if v_arr[-1] < 0.0:
+            # Find time `t1` where `v = 0`
+            t_pos = t_arr[v_arr > 0][-1]
+            t_neg = t_arr[v_arr < 0][0]
+            interp_t = scipy.interpolate.interp1d(t_arr, v_arr)
+            sol = scipy.optimize.root_scalar(interp_t, bracket=[t_pos, t_neg])
+            t1 = sol.root
+
+        t_arr, s_arr, v_arr = position(t1, self._decel_fun, t0, v0, s0)
+        t_min = t_arr[0]
+        t_max = t_arr[-1]
+
+        interp_v = scipy.interpolate.interp1d(v_arr, t_arr)
+
+        def f(v: float) -> float:
+            if v0 >= v >= 0.0:
+                t = interp_v(v)
+            elif 0.0 > v:
+                t = t_max
+            else:
+                t = t_min
+            return t
+
+        return f
 
 
 class TrapezoidalProfile(MotionProfile):

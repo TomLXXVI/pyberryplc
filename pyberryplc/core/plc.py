@@ -465,7 +465,7 @@ class AbstractPLC(ABC):
         ...
 
     @abstractmethod
-    def crash_routine(self, exception: Exception) -> None:
+    def crash_routine(self, exception: Exception | KeyboardInterrupt) -> None:
         """Handles unexpected runtime exceptions."""
         pass
 
@@ -486,9 +486,13 @@ class AbstractPLC(ABC):
             else:
                 self.exit_routine()
                 self.write_outputs()
+        except KeyboardInterrupt as e:
+            self.logger.warning(
+                "KeyboardInterrupt received — invoking crash routine."
+            )
+            self.crash_routine(e)
         except Exception as e:
             self.logger.exception(
-                "Unexpected exception occurred. "
-                "Entering crash routine."
+                "Unexpected exception occurred — invoking crash routine."
             )
             self.crash_routine(e)

@@ -3,7 +3,7 @@
 # === CONFIGURATION ===
 PROJECT_DIR="/shared/python-projects/pyberryplc/examples/stepper_motor"
 VENV_PATH="/home/tom-chr/.virtualenvs/pyberryplc"
-SCRIPT="stepper_motor05.py"
+SCRIPT="stepper_motor06.py"
 
 # === EXECUTION ===
 cd "$PROJECT_DIR" || { echo "Directory not found"; exit 1; }

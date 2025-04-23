@@ -1,43 +1,105 @@
 """
-Test script for dynamic motion profile using DynamicDelayGenerator.
-
-When the start button is pressed, the motor begins to accelerate.
-When the stop button is pressed, the motor decelerates and stops.
-
-Intended to be run on a Raspberry Pi using a GPIO-compatible StepperMotor subclass.
+Test script for dynamic motion profile using DynamicDelayGenerator and SFC-style PLC logic.
+Control via keyboard input:
+- Press 's' to start motion.
+- Press 'x' to stop (trigger deceleration).
 """
-from pyberryplc.core import AbstractPLC
-from pyberryplc.motion_profiles import TrapezoidalProfile, DynamicDelayGenerator
-from pyberryplc.stepper.driver import A4988StepperMotor  # or your specific subclass
-from pyberryplc.gpio import DigitalInput
 
-class DynamicMotionPLC(AbstractPLC):
-    def init_control(self):
-        self.button_start = self.add_digital_input(pin=17, pull_up=True)
-        self.button_stop = self.add_digital_input(pin=27, pull_up=True)
+import os
+from pyberryplc.core.plc import AbstractPLC
+from pyberryplc.motion_profiles.motion_profile import TrapezoidalProfile
+from pyberryplc.motion_profiles.dynamic_generator import DynamicDelayGenerator
+from pyberryplc.stepper import TMC2208StepperMotor, TMC2208UART
+from pyberryplc.log_utils import init_logger
+from keyboard_input import KeyInput
 
-        self.stepper = A4988StepperMotor(step_pin=20, dir_pin=21)
-        self.profile = TrapezoidalProfile(v_m=360.0, a_m=720.0, ds_tot=90.0)  # deg/s, deg/s², deg
-        self.generator = DynamicDelayGenerator(self.stepper, self.profile)
 
-        self.motion_active = False
+class StepperDynamicPLC(AbstractPLC):
+    def __init__(self):
+        super().__init__()
 
-    def execute_actions(self):
-        if self.button_start.read() and not self.motion_active:
-            self.logger.info("Motion started.")
-            self.stepper.start_rotation_dynamic(self.generator, direction="forward")
-            self.motion_active = True
+        self.key_input = KeyInput()
 
-        if self.button_stop.read() and self.motion_active:
-            self.logger.info("Motion stopping...")
+        self.stepper = TMC2208StepperMotor(
+            step_pin=27,
+            dir_pin=26,
+            full_steps_per_rev=200,
+            microstep_resolution="1/8",
+            uart=TMC2208UART(port="/dev/ttyAMA0"),
+            high_sensitivity=True,
+            logger=self.logger
+        )
+
+        self.profile = TrapezoidalProfile(v_m=180.0, a_m=720.0, ds_tot=90.0)
+        self.generator = None
+        
+        self.X0 = self.add_marker("X0")  # Idle
+        self.X1 = self.add_marker("X1")  # Motion active
+        self.X2 = self.add_marker("X2")
+        
+        self._init_done = False
+
+    def _init_control(self):
+        if not self._init_done:
+            self._init_done = True
+            self.stepper.enable()
+            self.stepper.set_microstepping()
+            self.stepper.set_current_via_uart(
+                run_current_pct=19, 
+                hold_current_pct=10
+            )
+            self.X0.activate()
+
+    def _sequence_control(self):
+        if self.X0.active and not self.stepper.busy:
+            if self.key_input.rising_edge("s"):
+                self.logger.info("Key 's' pressed: starting motion.")
+                self.X0.deactivate()
+                self.X1.activate()
+
+        if self.X1.active and self.key_input.rising_edge("r"):
+            self.logger.info("Key 'r' pressed: stopping motion.")
             self.generator.trigger_decel()
-            self.motion_active = False
+            self.X1.deactivate()
+            self.X2.activate()
+        
+        if self.X2.active and not self.stepper.busy:
+            self.X2.deactivate()
+            self.X0.activate()
 
-        self.stepper.do_single_step()
+    def _execute_actions(self):
+        if self.X0.rising_edge:
+            self.generator = DynamicDelayGenerator(self.stepper, self.profile)
+        
+        if self.X1.active or self.X2.active:
+            if self.X1.rising_edge:
+                self.logger.info("Stepper starts moving.")
+                self.stepper.start_rotation_dynamic(
+                    self.generator, 
+                    direction="forward"
+                )
+            self.stepper.do_single_step()
+        
+    def control_routine(self):
+        self.key_input.update()
+        self._init_control()
+        self._sequence_control()
+        self._execute_actions()
+
+    def exit_routine(self):
+        self.logger.info("Disabling stepper driver.")
+        self.stepper.disable()
+
+    def emergency_routine(self):
+        self.logger.warning("Emergency routine triggered.")
+        self.stepper.disable()
+
+    def crash_routine(self, exception: Exception) -> None:
+        self.exit_routine()
+
 
 if __name__ == "__main__":
-    plc = DynamicMotionPLC(scan_cycle=0.005)
-    try:
-        plc.run()
-    except KeyboardInterrupt:
-        plc.stop()
+    os.system("clear")
+    init_logger(logging_level="debug")
+    plc = StepperDynamicPLC()
+    plc.run()

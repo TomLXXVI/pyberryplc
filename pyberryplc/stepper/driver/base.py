@@ -223,7 +223,7 @@ class StepperMotor(ABC):
             start_angle + i * self.step_angle 
             for i in range(int(final_angle / self.step_angle))
         ]
-        times = list(map(profile.time_from_position_fn(), angles))
+        times = list(map(profile.get_fn_time_from_position(), angles))
         delays = [t2 - t1 - self.step_width for t1, t2 in zip(times, times[1:])]
 
         for delay in delays:
@@ -304,7 +304,7 @@ class StepperMotor(ABC):
             start_angle + i * self.step_angle 
             for i in range(int(final_angle / self.step_angle))
         ]
-        times = list(map(profile.time_from_position_fn(), angles))
+        times = list(map(profile.get_fn_time_from_position(), angles))
         delays = [t2 - t1 - self.step_width for t1, t2 in zip(times, times[1:])]
         self._delays = deque(delays)
         self._busy = True
@@ -347,6 +347,7 @@ class StepperMotor(ABC):
                 delay = self._dynamic_generator.next_delay() - self.step_width
                 self._next_step_time = now + delay
             except StopIteration:
+                self.logger.info("Motion complete.")
                 self._busy = False
                 self._dynamic_generator = None
 
