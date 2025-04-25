@@ -11,7 +11,7 @@ from pyberryplc.motion_profiles.motion_profile import TrapezoidalProfile
 from pyberryplc.motion_profiles.dynamic_generator import DynamicDelayGenerator
 from pyberryplc.stepper import TMC2208StepperMotor, TMC2208UART
 from pyberryplc.log_utils import init_logger
-from keyboard_input import KeyInput
+from pyberryplc.utils.keyboard_input import KeyInput
 
 
 class StepperDynamicPLC(AbstractPLC):
