@@ -17,6 +17,9 @@ dependencies = [
     "pyserial",
     "numpy",
     "scipy",
+    "flask",
+    "flask-socketio",
+    "eventlet"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

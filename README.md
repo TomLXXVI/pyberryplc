@@ -1,8 +1,12 @@
 # pyberryplc
 
-pyberryplc is a modular PLC framework written in Python for the Raspberry Pi platform. It enables real-time control of GPIO- and UART-driven components such as stepper motors.
+pyberryplc is a modular PLC framework written in Python for the Raspberry Pi 
+platform. It enables real-time control of GPIO- and UART-driven components such 
+as stepper motors.
 
-The project is designed to make the Raspberry Pi function as a fully programmable logic controller (PLC), with support for structured sequential logic (SFC), motion profiles, and field I/O — implemented entirely in Python.
+The project is designed to make the Raspberry Pi function as a fully 
+programmable logic controller (PLC), with support for structured sequential 
+logic (SFC), motion profiles, and field I/O — implemented entirely in Python.
 
 ## Features
 
@@ -51,13 +55,16 @@ pyberryplc/
 
 ## Background and Motivation
 
-This project is aimed at developers and control engineers looking for a software-only alternative to ladder logic or proprietary PLC platforms.
+This project is aimed at developers and control engineers looking for a 
+software-only alternative to ladder logic or proprietary PLC platforms.
 
-It leverages the flexibility of Python and the I/O capabilities of Raspberry Pi to implement motion control applications with deterministic step sequencing.
+It leverages the flexibility of Python and the I/O capabilities of Raspberry Pi 
+to implement motion control applications with deterministic step sequencing.
 
 ## Documentation
 
-Basic usage examples are included in the `examples/` directory. Full documentation will be added in a later phase.
+Basic usage examples are included in the `examples/` directory. 
+Full documentation will be added in a later phase.
 
 ## Author
 
@@ -67,4 +74,3 @@ Control systems developer and Raspberry Pi integrator
 ## License
 
 MIT License
-

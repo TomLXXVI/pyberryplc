@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>pyberryplc HMI</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" crossorigin="anonymous"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        label, input { display: block; margin: 0.5rem 0; }
+        #sg_result { font-weight: bold; font-size: 1.2em; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>pyberryplc HMI</h1>
+
+    <form action="/set_currents" method="post">
+        <label for="run_current_pct">Run Current (%):</label>
+        <input type="number" name="run_current_pct" id="run_current_pct" value="{{ run_current }}" required>
+
+        <label for="hold_current_pct">Hold Current (%):</label>
+        <input type="number" name="hold_current_pct" id="hold_current_pct" value="{{ hold_current }}" required>
+
+        <button type="submit">Apply</button>
+    </form>
+
+    <div id="sg_result">SG_RESULT: loading...</div>
+
+    <script>
+    const socket = io();
+
+    socket.on('connect', function() {
+        console.log('[SocketIO] Connected to server');
+    });
+
+    socket.on('disconnect', function() {
+        console.log('[SocketIO] Disconnected from server');
+    });
+
+    socket.on('sg_update', function(data) {
+        console.log('[SocketIO] Received SG_RESULT:', data.sg_result);
+        document.getElementById('sg_result').textContent = 'SG_RESULT: ' + data.sg_result;
+    });
+    </script>
+
+</body>
+</html>
